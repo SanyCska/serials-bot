@@ -11,6 +11,8 @@ from telegram.ext import (
     CallbackContext,
 )
 from dotenv import load_dotenv
+from flask import Flask
+import threading
 
 from bot.database.models import init_db
 from bot.database.db_handler import DBHandler
@@ -39,6 +41,13 @@ logging.basicConfig(
     level=logging.INFO
 )
 logger = logging.getLogger(__name__)
+
+# Create Flask app for health check
+app = Flask(__name__)
+
+@app.route('/')
+def health_check():
+    return 'Bot is running'
 
 class SeriesTrackerBot:
     def __init__(self):
@@ -450,28 +459,48 @@ class SeriesTrackerBot:
         # Start the notification scheduler
         self.scheduler.start()
         
+        # Get port from environment variable (Render sets this)
+        port = int(os.getenv('PORT', '10000'))
+        
         if use_webhook:
             # Webhook configuration
-            port = int(os.getenv('PORT', 8443))
             webhook_url = os.getenv('WEBHOOK_URL')
             
             if not webhook_url:
-                logger.error("WEBHOOK_URL environment variable is not set. Falling back to polling mode.")
-                self.start_bot(use_webhook=False)
-                return
+                logger.warning("WEBHOOK_URL environment variable is not set. Falling back to polling mode with health check server.")
+                # Start Flask server in a separate thread
+                flask_thread = threading.Thread(target=lambda: app.run(host='0.0.0.0', port=port))
+                flask_thread.daemon = True
+                flask_thread.start()
                 
-            # Start webhook
-            self.updater.start_webhook(
-                listen='0.0.0.0',
-                port=port,
-                url_path=os.getenv('TELEGRAM_BOT_TOKEN'),
-                webhook_url=f"{webhook_url}/{os.getenv('TELEGRAM_BOT_TOKEN')}"
-            )
-            logger.info(f"Bot started in webhook mode on port {port}")
+                # Clear any existing webhooks
+                self.updater.bot.delete_webhook()
+                
+                # Start polling
+                self.updater.start_polling(drop_pending_updates=True)
+                logger.info(f"Bot started in polling mode with health check server on port {port}")
+            else:
+                # Start webhook
+                self.updater.start_webhook(
+                    listen='0.0.0.0',
+                    port=port,
+                    url_path=os.getenv('TELEGRAM_BOT_TOKEN'),
+                    webhook_url=f"{webhook_url}/{os.getenv('TELEGRAM_BOT_TOKEN')}",
+                    drop_pending_updates=True
+                )
+                logger.info(f"Bot started in webhook mode on port {port}")
         else:
+            # Start Flask server in a separate thread for health checks
+            flask_thread = threading.Thread(target=lambda: app.run(host='0.0.0.0', port=port))
+            flask_thread.daemon = True
+            flask_thread.start()
+            
+            # Clear any existing webhooks
+            self.updater.bot.delete_webhook()
+            
             # Start polling
-            self.updater.start_polling()
-            logger.info("Bot started in polling mode. Press Ctrl+C to stop.")
+            self.updater.start_polling(drop_pending_updates=True)
+            logger.info(f"Bot started in polling mode with health check server on port {port}")
         
         # Run the bot until the user presses Ctrl+C
         self.updater.idle()
@@ -779,7 +808,7 @@ def main():
     """Start the bot."""
     bot = SeriesTrackerBot()
     # Use webhook in production, polling in development
-    use_webhook = os.getenv('ENVIRONMENT', 'production').lower() == 'production'
+    use_webhook = os.getenv('ENVIRONMENT', 'development').lower() == 'production'
     bot.start_bot(use_webhook)
     
 if __name__ == '__main__':
