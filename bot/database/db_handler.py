@@ -1,5 +1,9 @@
 from datetime import datetime
 from .models import User, Series, UserSeries, get_session, init_db
+from typing import Optional, List, Tuple
+import logging
+
+logger = logging.getLogger(__name__)
 
 class DBHandler:
     def __init__(self):
@@ -7,29 +11,49 @@ class DBHandler:
         
     def add_user(self, telegram_id, username=None, first_name=None, last_name=None):
         """Add a new user to the database or update existing one"""
-        user = self.session.query(User).filter(User.telegram_id == str(telegram_id)).first()
-        
-        if user is None:
-            user = User(
-                telegram_id=str(telegram_id),
-                username=username,
-                first_name=first_name,
-                last_name=last_name
-            )
-            self.session.add(user)
-            self.session.commit()
-        else:
-            # Update user info
-            user.username = username
-            user.first_name = first_name
-            user.last_name = last_name
-            self.session.commit()
+        try:
+            # Convert telegram_id to string for consistency
+            telegram_id_str = str(telegram_id)
+            user = self.session.query(User).filter(User.telegram_id == telegram_id_str).first()
             
-        return user
+            if user is None:
+                user = User(
+                    telegram_id=telegram_id_str,
+                    username=username,
+                    first_name=first_name,
+                    last_name=last_name
+                )
+                self.session.add(user)
+                self.session.commit()
+            else:
+                # Update user info
+                user.username = username
+                user.first_name = first_name
+                user.last_name = last_name
+                self.session.commit()
+                
+            return user
+        except Exception as e:
+            logger.error(f"Error adding/updating user: {e}", exc_info=True)
+            self.session.rollback()
+            return None
     
-    def get_user(self, telegram_id):
-        """Get a user by their Telegram ID"""
-        return self.session.query(User).filter(User.telegram_id == str(telegram_id)).first()
+    def get_user(self, telegram_id: int) -> Optional[User]:
+        """Get a user by their Telegram ID."""
+        try:
+            logger.info(f"Attempting to get user with telegram_id: {telegram_id}")
+            # Convert telegram_id to string for comparison
+            user = self.session.query(User).filter(User.telegram_id == str(telegram_id)).first()
+            if user:
+                logger.info(f"Found user: {user.id}")
+            else:
+                logger.warning(f"No user found for telegram_id: {telegram_id}")
+            return user
+        except Exception as e:
+            logger.error(f"Error getting user: {e}", exc_info=True)
+            # Rollback the session in case of error
+            self.session.rollback()
+            return None
     
     def add_series(self, tmdb_id, name, year=None, total_seasons=None):
         """Add a new series or update an existing one"""
@@ -115,20 +139,25 @@ class DBHandler:
         
         return False
     
-    def get_user_series_list(self, user_id, watchlist_only=False, watched_only=False):
-        """Get all series a user is watching, has in watchlist, or has watched"""
-        query = self.session.query(UserSeries, Series).join(
-            Series, UserSeries.series_id == Series.id
-        ).filter(UserSeries.user_id == user_id)
-        
-        if watchlist_only:
-            query = query.filter(UserSeries.in_watchlist == True)
-        elif watched_only:
-            query = query.filter(UserSeries.is_watched == True)
-        else:
-            query = query.filter(UserSeries.is_watching == True)
+    def get_user_series_list(self, user_id: int, watchlist_only: bool = False, watched_only: bool = False) -> List[Tuple[UserSeries, Series]]:
+        """Get a list of series for a user."""
+        try:
+            logger.info(f"Getting series list for user {user_id}, watchlist_only={watchlist_only}, watched_only={watched_only}")
+            query = self.session.query(UserSeries, Series).join(Series)
             
-        return query.all()
+            if watchlist_only:
+                query = query.filter(UserSeries.user_id == user_id, UserSeries.in_watchlist == True)
+            elif watched_only:
+                query = query.filter(UserSeries.user_id == user_id, UserSeries.is_watched == True)
+            else:
+                query = query.filter(UserSeries.user_id == user_id, UserSeries.in_watchlist == False)
+                
+            result = query.all()
+            logger.info(f"Found {len(result)} series for user {user_id}")
+            return result
+        except Exception as e:
+            logger.error(f"Error getting user series list: {e}", exc_info=True)
+            return []
     
     def get_all_watching_users(self, series_id):
         """Get all users watching a specific series"""

@@ -1,7 +1,7 @@
-from sqlalchemy import create_engine, Column, Integer, String, Boolean, DateTime, ForeignKey
+from sqlalchemy import Column, Integer, String, DateTime, Boolean, ForeignKey, create_engine
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship, sessionmaker
-import datetime
+from datetime import datetime
 import os
 from dotenv import load_dotenv
 
@@ -14,77 +14,71 @@ class User(Base):
     __tablename__ = 'users'
     
     id = Column(Integer, primary_key=True)
-    telegram_id = Column(String, unique=True, nullable=False)
-    username = Column(String, nullable=True)
-    first_name = Column(String, nullable=True)
-    last_name = Column(String, nullable=True)
-    joined_date = Column(DateTime, default=datetime.datetime.utcnow)
+    telegram_id = Column(String, unique=True, nullable=False)  # Store as string
+    username = Column(String)
+    first_name = Column(String)
+    last_name = Column(String)
+    joined_date = Column(DateTime, default=datetime.utcnow)
     
-    series = relationship("UserSeries", back_populates="user", cascade="all, delete-orphan")
+    # Relationships
+    series = relationship('UserSeries', back_populates='user')
     
     def __repr__(self):
-        return f"<User(telegram_id='{self.telegram_id}', username='{self.username}')>"
-
+        return f"<User(id={self.id}, telegram_id={self.telegram_id}, username={self.username})>"
 
 class Series(Base):
     __tablename__ = 'series'
     
     id = Column(Integer, primary_key=True)
-    tmdb_id = Column(Integer, unique=True, nullable=False)
+    tmdb_id = Column(Integer, unique=True)
     name = Column(String, nullable=False)
-    year = Column(Integer, nullable=True)
-    total_seasons = Column(Integer, nullable=True)
-    last_update = Column(DateTime, default=datetime.datetime.utcnow)
+    year = Column(Integer)
+    total_seasons = Column(Integer)
+    last_update = Column(DateTime, default=datetime.utcnow)
     
-    users = relationship("UserSeries", back_populates="series", cascade="all, delete-orphan")
+    # Relationships
+    users = relationship('UserSeries', back_populates='series')
     
     def __repr__(self):
-        return f"<Series(name='{self.name}', year='{self.year}')>"
-
+        return f"<Series(id={self.id}, name={self.name}, tmdb_id={self.tmdb_id})>"
 
 class UserSeries(Base):
     __tablename__ = 'user_series'
     
     id = Column(Integer, primary_key=True)
-    user_id = Column(Integer, ForeignKey('users.id'), nullable=False)
-    series_id = Column(Integer, ForeignKey('series.id'), nullable=False)
+    user_id = Column(Integer, ForeignKey('users.id'))
+    series_id = Column(Integer, ForeignKey('series.id'))
     current_season = Column(Integer, default=1)
     current_episode = Column(Integer, default=0)
     is_watching = Column(Boolean, default=True)
     in_watchlist = Column(Boolean, default=False)
     is_watched = Column(Boolean, default=False)
-    watched_date = Column(DateTime, nullable=True)
-    last_updated = Column(DateTime, default=datetime.datetime.utcnow)
+    watched_date = Column(DateTime)
+    last_updated = Column(DateTime, default=datetime.utcnow)
     
-    user = relationship("User", back_populates="series")
-    series = relationship("Series", back_populates="users")
+    # Relationships
+    user = relationship('User', back_populates='series')
+    series = relationship('Series', back_populates='users')
     
     def __repr__(self):
-        return f"<UserSeries(user_id='{self.user_id}', series_id='{self.series_id}', current_season='{self.current_season}', current_episode='{self.current_episode}')>"
-
+        return f"<UserSeries(user_id={self.user_id}, series_id={self.series_id}, season={self.current_season}, episode={self.current_episode})>"
 
 def get_database_url():
-    """Get database URL from environment variables or use default."""
+    """Construct the database URL from individual POSTGRES_* env variables."""
     db_user = os.getenv('POSTGRES_USER', 'postgres')
     db_password = os.getenv('POSTGRES_PASSWORD', 'postgres')
     db_host = os.getenv('POSTGRES_HOST', 'localhost')
     db_port = os.getenv('POSTGRES_PORT', '5432')
     db_name = os.getenv('POSTGRES_DB', 'serials_bot')
-    
     return f"postgresql://{db_user}:{db_password}@{db_host}:{db_port}/{db_name}"
 
-def get_engine():
-    """Create database engine."""
-    database_url = get_database_url()
-    return create_engine(database_url)
-
 def get_session():
-    """Create database session."""
-    engine = get_engine()
+    """Get a database session"""
+    engine = create_engine(get_database_url())
     Session = sessionmaker(bind=engine)
     return Session()
 
 def init_db():
-    """Initialize database tables."""
-    engine = get_engine()
+    """Initialize the database"""
+    engine = create_engine(get_database_url())
     Base.metadata.create_all(engine) 

@@ -30,6 +30,16 @@ from bot.conversations import (
     CANCEL_PATTERN,
     SEARCH_WATCHED,
     SERIES_SELECTION,
+    SELECT_SEASON,
+    SELECT_EPISODE,
+    MARK_WATCHED,
+    MANUAL_SEASON_ENTRY,
+    SERIES_PATTERN,
+    SEASON_PATTERN,
+    EPISODE_PATTERN,
+    MANUAL_ADD_PATTERN,
+    MANUAL_SEASON_PATTERN,
+    MANUAL_ENTRY_PATTERN,
 )
 
 # Load environment variables
@@ -74,7 +84,7 @@ class SeriesTrackerBot:
         self._set_commands()
         
         # Register handlers
-        self._register_handlers()
+        self.setup_handlers()
         
     def _set_commands(self):
         """Set the commands menu for the bot"""
@@ -95,154 +105,104 @@ class SeriesTrackerBot:
         self.updater.bot.set_my_commands(bot_commands)
         logger.info("Bot commands menu set up successfully")
         
-    def _register_handlers(self):
-        """Register all command and conversation handlers."""
-        # Basic command handlers
-        self.dispatcher.add_handler(CommandHandler('start', self.start))
-        self.dispatcher.add_handler(CommandHandler('help', self.help))
-        self.dispatcher.add_handler(CommandHandler('list', self.list_series))
-        self.dispatcher.add_handler(CommandHandler('check', self.check_updates))
-        self.dispatcher.add_handler(CommandHandler('watchlist', self.view_watchlist))
-        self.dispatcher.add_handler(CommandHandler('watched', self.list_watched))
+    def setup_handlers(self):
+        """Set up all the handlers for the bot."""
+        # Command handlers
+        self.dispatcher.add_handler(CommandHandler("start", self.start))
+        self.dispatcher.add_handler(CommandHandler("help", self.help_command))
+        self.dispatcher.add_handler(CommandHandler("addwatch", self.conversation_manager.add_to_watchlist_start))
+        self.dispatcher.add_handler(CommandHandler("list", self.list_series))
+        self.dispatcher.add_handler(CommandHandler("watchlist", self.conversation_manager.view_watchlist_start))
+        self.dispatcher.add_handler(CommandHandler("remove", self.conversation_manager.remove_series_start))
+        self.dispatcher.add_handler(CommandHandler("addwatched", self.conversation_manager.add_watched_series_start))
+        self.dispatcher.add_handler(CommandHandler("markwatched", self.conversation_manager.mark_watched_start))
         
-        # Add mark watched handler
-        self.dispatcher.add_handler(CallbackQueryHandler(self.mark_watched_callback, pattern=r'^mark_watched_'))
-        
-        # Add watched series conversation handler (needs to be before the command buttons handler)
-        add_watched_conv = ConversationHandler(
-            entry_points=[
-                CommandHandler('addwatched', self.conversation_manager.add_watched_series_start),
-                CallbackQueryHandler(self.conversation_manager.add_watched_series_start, pattern=r'^command_addwatched$')
-            ],
-            states={
-                SELECTING_SERIES: [
-                    MessageHandler(Filters.text & ~Filters.command, self.conversation_manager.search_series),
-                    CallbackQueryHandler(self.conversation_manager.series_selected, pattern=r'^series_|^manual_add$|^cancel$'),
-                ],
-                SEARCH_WATCHED: [
-                    MessageHandler(Filters.text & ~Filters.command, self.conversation_manager.search_watched_series)
-                ],
-                MANUAL_SERIES_NAME: [
-                    MessageHandler(Filters.text & ~Filters.command, self.conversation_manager.manual_series_name_entered),
-                ],
-                MANUAL_SERIES_YEAR: [
-                    MessageHandler(Filters.text & ~Filters.command, self.conversation_manager.manual_series_year_entered),
-                ],
-                MANUAL_SERIES_SEASONS: [
-                    MessageHandler(Filters.text & ~Filters.command, self.conversation_manager.manual_series_seasons_entered),
-                ],
-            },
-            fallbacks=[
-                CommandHandler('cancel', self.conversation_manager.cancel),
-                CallbackQueryHandler(self.conversation_manager.cancel, pattern=r'^cancel$')
-            ],
-        )
-        self.dispatcher.add_handler(add_watched_conv)
-        
-        # Command buttons handler
-        self.dispatcher.add_handler(CallbackQueryHandler(self.handle_command_button, pattern=r'^command_'))
-        
-        # Move to watchlist handler
-        self.dispatcher.add_handler(CallbackQueryHandler(self.move_to_watchlist, pattern=r'^move_watchlist_'))
-        
-        # Add series conversation
+        # Add series conversation handler
         add_series_conv = ConversationHandler(
-            entry_points=[CommandHandler('add', self.conversation_manager.add_series_start)],
+            entry_points=[
+                CommandHandler("add", self.conversation_manager.add_series_start),
+                CallbackQueryHandler(self.conversation_manager.add_series_start, pattern="^command_add$")
+            ],
             states={
                 SELECTING_SERIES: [
                     MessageHandler(Filters.text & ~Filters.command, self.conversation_manager.search_series),
-                    CallbackQueryHandler(self.conversation_manager.series_selected, pattern=r'^series_|^manual_add$|^cancel$'),
+                    CallbackQueryHandler(self.conversation_manager.series_selected, pattern=f"^{SERIES_PATTERN.format('.*')}$"),
+                    CallbackQueryHandler(self.conversation_manager.manual_series_name_entered, pattern=f"^{MANUAL_ADD_PATTERN}$")
+                ],
+                MANUAL_SERIES_NAME: [
+                    MessageHandler(Filters.text & ~Filters.command, self.conversation_manager.manual_series_name_entered)
+                ],
+                MANUAL_SERIES_YEAR: [
+                    MessageHandler(Filters.text & ~Filters.command, self.conversation_manager.manual_series_year_entered)
+                ],
+                MANUAL_SERIES_SEASONS: [
+                    MessageHandler(Filters.text & ~Filters.command, self.conversation_manager.manual_series_seasons_entered)
                 ],
                 SELECTING_SEASON: [
-                    CallbackQueryHandler(self.conversation_manager.season_selected, pattern=r'^season_|^cancel$'),
+                    CallbackQueryHandler(self.conversation_manager.season_selected, pattern=f"^{SEASON_PATTERN.format('.*', '.*')}$"),
+                    CallbackQueryHandler(self.conversation_manager.manual_season_entry, pattern=f"^{MANUAL_SEASON_PATTERN.format('.*')}$")
+                ],
+                MANUAL_SEASON_ENTRY: [
+                    MessageHandler(Filters.text & ~Filters.command, self.conversation_manager.manual_season_entry)
                 ],
                 SELECTING_EPISODE: [
-                    CallbackQueryHandler(self.conversation_manager.episode_selected, pattern=r'^(episode_|manual_|cancel$)'),
+                    CallbackQueryHandler(self.conversation_manager.episode_selected, pattern=f"^{EPISODE_PATTERN.format('.*', '.*', '.*')}$"),
+                    CallbackQueryHandler(self.conversation_manager.manual_episode_entry, pattern=f"^{MANUAL_ENTRY_PATTERN.format('.*', '.*')}$")
                 ],
                 MANUAL_EPISODE_ENTRY: [
-                    MessageHandler(Filters.text & ~Filters.command, self.conversation_manager.manual_episode_entry),
-                ],
-                MANUAL_SERIES_NAME: [
-                    MessageHandler(Filters.text & ~Filters.command, self.conversation_manager.manual_series_name_entered),
-                ],
-                MANUAL_SERIES_YEAR: [
-                    MessageHandler(Filters.text & ~Filters.command, self.conversation_manager.manual_series_year_entered),
-                ],
-                MANUAL_SERIES_SEASONS: [
-                    MessageHandler(Filters.text & ~Filters.command, self.conversation_manager.manual_series_seasons_entered),
-                ],
+                    MessageHandler(Filters.text & ~Filters.command, self.conversation_manager.manual_episode_entry)
+                ]
             },
-            fallbacks=[CommandHandler('cancel', self.conversation_manager.cancel)],
-        )
-        self.dispatcher.add_handler(add_series_conv)
-        
-        # Add to watchlist conversation
-        add_to_watchlist_conv = ConversationHandler(
-            entry_points=[CommandHandler('addwatch', self.conversation_manager.add_to_watchlist_start)],
-            states={
-                SELECTING_SERIES: [
-                    MessageHandler(Filters.text & ~Filters.command, self.conversation_manager.search_series),
-                    CallbackQueryHandler(self.conversation_manager.series_selected, pattern=r'^series_|^manual_add$|^cancel$'),
-                ],
-                MANUAL_SERIES_NAME: [
-                    MessageHandler(Filters.text & ~Filters.command, self.conversation_manager.manual_series_name_entered),
-                ],
-                MANUAL_SERIES_YEAR: [
-                    MessageHandler(Filters.text & ~Filters.command, self.conversation_manager.manual_series_year_entered),
-                ],
-                MANUAL_SERIES_SEASONS: [
-                    MessageHandler(Filters.text & ~Filters.command, self.conversation_manager.manual_series_seasons_entered),
-                ],
-            },
-            fallbacks=[CommandHandler('cancel', self.conversation_manager.cancel)],
-        )
-        self.dispatcher.add_handler(add_to_watchlist_conv)
-        
-        # Watchlist actions handler (outside of conversation handler)
-        self.dispatcher.add_handler(
-            CallbackQueryHandler(
-                self.conversation_manager.handle_watchlist_actions,
-                pattern=r'^(watchlist_series_|move_watching_)'
-            )
+            fallbacks=[CommandHandler("cancel", self.conversation_manager.cancel)]
         )
         
-        # Watchlist view handler
-        self.dispatcher.add_handler(CommandHandler('watchlist', self.conversation_manager.view_watchlist_start))
-        
-        # Update series conversation
+        # Update series conversation handler
         update_series_conv = ConversationHandler(
-            entry_points=[CommandHandler('update', self.conversation_manager.update_series_start)],
+            entry_points=[
+                CommandHandler("update", self.conversation_manager.update_series_start),
+                CallbackQueryHandler(self.conversation_manager.update_series_start, pattern="^command_update$"),
+                CallbackQueryHandler(self.conversation_manager.update_series_start, pattern="^series_")
+            ],
             states={
                 SELECTING_SERIES: [
-                    CallbackQueryHandler(self.conversation_manager.series_selected, pattern=r'^series_|^cancel$'),
+                    CallbackQueryHandler(self.conversation_manager.series_selected, pattern=f"^{SERIES_PATTERN.format('.*')}$"),
+                    CallbackQueryHandler(self.conversation_manager.cancel, pattern=f"^{CANCEL_PATTERN}$")
                 ],
                 SELECTING_SEASON: [
-                    CallbackQueryHandler(self.conversation_manager.season_selected, pattern=r'^season_|^cancel$'),
+                    CallbackQueryHandler(self.conversation_manager.season_selected, pattern=f"^{SEASON_PATTERN.format('.*', '.*')}$"),
+                    CallbackQueryHandler(self.conversation_manager.manual_season_entry, pattern=f"^{MANUAL_SEASON_PATTERN.format('.*')}$"),
+                    CallbackQueryHandler(self.conversation_manager.cancel, pattern=f"^{CANCEL_PATTERN}$")
+                ],
+                MANUAL_SEASON_ENTRY: [
+                    MessageHandler(Filters.text & ~Filters.command, self.conversation_manager.manual_season_entry)
                 ],
                 SELECTING_EPISODE: [
-                    CallbackQueryHandler(self.conversation_manager.episode_selected, pattern=r'^(episode_|manual_|cancel$)'),
+                    CallbackQueryHandler(self.conversation_manager.episode_selected, pattern=f"^{EPISODE_PATTERN.format('.*', '.*', '.*')}$"),
+                    CallbackQueryHandler(self.conversation_manager.manual_episode_entry, pattern=f"^{MANUAL_ENTRY_PATTERN.format('.*', '.*')}$"),
+                    CallbackQueryHandler(self.conversation_manager.cancel, pattern=f"^{CANCEL_PATTERN}$")
                 ],
                 MANUAL_EPISODE_ENTRY: [
                     MessageHandler(Filters.text & ~Filters.command, self.conversation_manager.manual_episode_entry),
-                ],
+                    CallbackQueryHandler(self.conversation_manager.manual_episode_entry, pattern=f"^{MANUAL_ENTRY_PATTERN.format('.*', '.*')}$")
+                ]
             },
-            fallbacks=[CommandHandler('cancel', self.conversation_manager.cancel)],
+            fallbacks=[CommandHandler("cancel", self.conversation_manager.cancel)]
         )
+        
+        # Add both conversation handlers
+        self.dispatcher.add_handler(add_series_conv)
         self.dispatcher.add_handler(update_series_conv)
         
-        # Remove series conversation
-        remove_series_conv = ConversationHandler(
-            entry_points=[CommandHandler('remove', self.conversation_manager.remove_series_start)],
-            states={
-                SELECTING_SERIES: [
-                    CallbackQueryHandler(self.remove_series, pattern=r'^series_|^cancel$'),
-                ],
-            },
-            fallbacks=[CommandHandler('cancel', self.conversation_manager.cancel)],
-        )
-        self.dispatcher.add_handler(remove_series_conv)
+        # Command button handlers
+        self.dispatcher.add_handler(CallbackQueryHandler(self.handle_command_button, pattern="^command_"))
         
-        # Error handler
+        # Watchlist action handlers
+        self.dispatcher.add_handler(CallbackQueryHandler(self.conversation_manager.handle_watchlist_actions, pattern="^(move_watching_|watchlist_series_)"))
+        
+        # Mark watched handlers
+        self.dispatcher.add_handler(CallbackQueryHandler(self.conversation_manager.mark_watched_selected, pattern="^watched_"))
+        
+        # Add error handler
         self.dispatcher.add_error_handler(self.error_handler)
         
     def start(self, update: Update, context: CallbackContext) -> None:
@@ -282,7 +242,7 @@ class SeriesTrackerBot:
             reply_markup=reply_markup
         )
         
-    def help(self, update: Update, context: CallbackContext) -> None:
+    def help_command(self, update: Update, context: CallbackContext) -> None:
         """Send a message when the command /help is issued."""
         # Create inline keyboard with primary commands
         keyboard = [
@@ -330,9 +290,11 @@ class SeriesTrackerBot:
         
     def list_series(self, update: Update, context: CallbackContext) -> None:
         """List all TV series the user is watching."""
+        logger.info(f"List command received from user {update.effective_user.id}")
         user = self.db.get_user(update.effective_user.id)
         
         if not user:
+            logger.warning(f"User not found in database for telegram_id: {update.effective_user.id}")
             # Create keyboard with options
             keyboard = [
                 [InlineKeyboardButton("Add Series", callback_data="command_add")],
@@ -347,8 +309,10 @@ class SeriesTrackerBot:
             return
             
         user_series_list = self.db.get_user_series_list(user.id)
+        logger.info(f"Retrieved {len(user_series_list) if user_series_list else 0} series for user {user.id}")
         
         if not user_series_list:
+            logger.info(f"No series found for user {user.id}")
             # Create keyboard with options
             keyboard = [
                 [InlineKeyboardButton("Add Series", callback_data="command_add")],
@@ -363,38 +327,51 @@ class SeriesTrackerBot:
             return
             
         # Send header message
-        update.message.reply_text("*Your TV Series Watchlist:*", parse_mode=ParseMode.MARKDOWN)
+        try:
+            update.message.reply_text("*Your TV Series Watchlist:*", parse_mode=ParseMode.MARKDOWN)
+            logger.info("Sent header message")
+        except Exception as e:
+            logger.error(f"Error sending header message: {e}")
+            return
         
         # Send each series as a separate message
         for user_series, series in user_series_list:
-            year_str = f" ({series.year})" if series.year else ""
-            message = f"• *{series.name}*{year_str}\n"
-            message += f"  Currently at: Season {user_series.current_season}, Episode {user_series.current_episode}"
-            
-            # Create buttons for updating progress and marking as watched
+            try:
+                year_str = f" ({series.year})" if series.year else ""
+                message = f"• *{series.name}*{year_str}\n"
+                message += f"  Currently at: Season {user_series.current_season}, Episode {user_series.current_episode}"
+                
+                # Create buttons for updating progress and marking as watched
+                keyboard = [
+                    [
+                        InlineKeyboardButton(f"📝 Update", callback_data=f"series_{series.tmdb_id}"),
+                        InlineKeyboardButton(f"✅ Watched", callback_data=f"mark_watched_{series.id}")
+                    ]
+                ]
+                reply_markup = InlineKeyboardMarkup(keyboard)
+                
+                update.message.reply_text(message, parse_mode=ParseMode.MARKDOWN, reply_markup=reply_markup)
+                logger.info(f"Sent message for series: {series.name}")
+            except Exception as e:
+                logger.error(f"Error sending message for series {series.name}: {e}")
+        
+        # Send footer with common actions
+        try:
             keyboard = [
                 [
-                    InlineKeyboardButton(f"📝 Update", callback_data=f"series_{series.tmdb_id}"),
-                    InlineKeyboardButton(f"✅ Watched", callback_data=f"mark_watched_{series.id}")
+                    InlineKeyboardButton("➕ Add Series", callback_data="command_add"),
+                    InlineKeyboardButton("🔄 Check Updates", callback_data="command_check")
+                ],
+                [
+                    InlineKeyboardButton("📺 My Watchlist", callback_data="command_watchlist"),
+                    InlineKeyboardButton("❓ Help", callback_data="command_help")
                 ]
             ]
             reply_markup = InlineKeyboardMarkup(keyboard)
-            
-            update.message.reply_text(message, parse_mode=ParseMode.MARKDOWN, reply_markup=reply_markup)
-        
-        # Send footer with common actions
-        keyboard = [
-            [
-                InlineKeyboardButton("➕ Add Series", callback_data="command_add"),
-                InlineKeyboardButton("🔄 Check Updates", callback_data="command_check")
-            ],
-            [
-                InlineKeyboardButton("📺 My Watchlist", callback_data="command_watchlist"),
-                InlineKeyboardButton("❓ Help", callback_data="command_help")
-            ]
-        ]
-        reply_markup = InlineKeyboardMarkup(keyboard)
-        update.message.reply_text("*Actions:*", parse_mode=ParseMode.MARKDOWN, reply_markup=reply_markup)
+            update.message.reply_text("*Actions:*", parse_mode=ParseMode.MARKDOWN, reply_markup=reply_markup)
+            logger.info("Sent footer message with actions")
+        except Exception as e:
+            logger.error(f"Error sending footer message: {e}")
         
     def check_updates(self, update: Update, context: CallbackContext) -> None:
         """Manually check for updates."""
@@ -516,130 +493,153 @@ class SeriesTrackerBot:
         self.conversation_manager.view_watchlist_start(update, context)
         
     def handle_command_button(self, update: Update, context: CallbackContext) -> None:
-        """Handle command buttons from inline keyboards"""
+        """Handle command buttons."""
         query = update.callback_query
         command = query.data.split('_')[1]
+        logger.info(f"Command button pressed: {command}")
         
-        # Execute appropriate command based on button pressed
         if command == 'add':
+            logger.info("Starting add series process...")
             query.answer("Starting add series process...")
             return self.conversation_manager.add_series_start(update, context)
         elif command == 'addwatch':
+            logger.info("Starting add to watchlist process...")
             query.answer("Starting add to watchlist process...")
             return self.conversation_manager.add_to_watchlist_start(update, context)
         elif command == 'list':
-            query.answer("Showing your series list...")
-            return self.list_series_callback(update, context)
+            logger.info("Showing series list...")
+            query.answer("Showing series list...")
+            return self.list_series(update, context)
         elif command == 'watchlist':
-            query.answer("Showing your watchlist...")
+            logger.info("Showing watchlist...")
+            query.answer("Showing watchlist...")
             return self.conversation_manager.view_watchlist_start(update, context)
-        elif command == 'check':
-            query.answer("Checking for updates...")
-            return self.check_updates_callback(update, context)
         elif command == 'update':
+            logger.info("Starting update series process...")
             query.answer("Starting update series process...")
             return self.conversation_manager.update_series_start(update, context)
-        elif command == 'remove':
-            query.answer("Starting remove series process...")
-            return self.conversation_manager.remove_series_start(update, context)
         elif command == 'help':
+            logger.info("Showing help...")
             query.answer("Showing help...")
-            return self.help(update, context)
+            return self.help_command(update, context)
         elif command == 'addwatched':
+            logger.info("Starting add watched series process...")
             query.answer("Starting add watched series process...")
             return self.conversation_manager.add_watched_series_start(update, context)
-        elif command == 'watched':
-            query.answer("Showing your watched series...")
-            return self.list_watched(update, context)
-        
-        # Fallback
-        query.answer("Command not recognized")
+        elif command == 'markwatched':
+            logger.info("Starting mark as watched process...")
+            query.answer("Starting mark as watched process...")
+            return self.conversation_manager.mark_watched_start(update, context)
+        else:
+            logger.warning(f"Unknown command button: {command}")
+            query.answer("Unknown command")
+            return ConversationHandler.END
         
     def list_series_callback(self, update: Update, context: CallbackContext) -> None:
         """List series from callback query"""
         query = update.callback_query
-        user = self.db.get_user(query.from_user.id)
+        logger.info(f"Processing list series callback for user {query.from_user.id}")
         
-        if not user:
-            # Create keyboard with options
-            keyboard = [
-                [InlineKeyboardButton("Add Series", callback_data="command_add")],
-                [InlineKeyboardButton("View Watchlist", callback_data="command_watchlist")],
-                [InlineKeyboardButton("Help", callback_data="command_help")]
-            ]
-            reply_markup = InlineKeyboardMarkup(keyboard)
-            query.edit_message_text(
-                "You need to add a series first. Use the Add Series button or /add command.",
-                reply_markup=reply_markup
-            )
-            return
+        try:
+            user = self.db.get_user(query.from_user.id)
             
-        user_series_list = self.db.get_user_series_list(user.id)
-        
-        if not user_series_list:
-            # Create keyboard with options
-            keyboard = [
-                [InlineKeyboardButton("Add Series", callback_data="command_add")],
-                [InlineKeyboardButton("View Watchlist", callback_data="command_watchlist")],
-                [InlineKeyboardButton("Help", callback_data="command_help")]
-            ]
-            reply_markup = InlineKeyboardMarkup(keyboard)
-            query.edit_message_text(
-                "You're not watching any series yet. Use the Add Series button or /add command.",
-                reply_markup=reply_markup
-            )
-            return
-            
-        # Edit current message to show header
-        query.edit_message_text("*Your TV Series Watchlist:*", parse_mode=ParseMode.MARKDOWN)
-        
-        # Send each series as a separate message
-        for user_series, series in user_series_list:
-            year_str = f" ({series.year})" if series.year else ""
-            message = f"• *{series.name}*{year_str}\n"
-            message += f"  Currently at: Season {user_series.current_season}, Episode {user_series.current_episode}"
-            
-            # Create buttons for updating progress and marking as watched
-            keyboard = [
-                [
-                    InlineKeyboardButton(f"📝 Update", callback_data=f"series_{series.tmdb_id}"),
-                    InlineKeyboardButton(f"✅ Watched", callback_data=f"mark_watched_{series.id}")
+            if not user:
+                logger.warning(f"User not found for telegram_id: {query.from_user.id}")
+                # Create keyboard with options
+                keyboard = [
+                    [InlineKeyboardButton("Add Series", callback_data="command_add")],
+                    [InlineKeyboardButton("View Watchlist", callback_data="command_watchlist")],
+                    [InlineKeyboardButton("Help", callback_data="command_help")]
                 ]
-            ]
-            reply_markup = InlineKeyboardMarkup(keyboard)
+                reply_markup = InlineKeyboardMarkup(keyboard)
+                query.edit_message_text(
+                    "You need to add a series first. Use the Add Series button or /add command.",
+                    reply_markup=reply_markup
+                )
+                return
+                
+            user_series_list = self.db.get_user_series_list(user.id)
+            logger.info(f"Retrieved {len(user_series_list) if user_series_list else 0} series for user {user.id}")
             
-            context.bot.send_message(
-                chat_id=query.message.chat_id,
-                text=message,
-                parse_mode=ParseMode.MARKDOWN,
-                reply_markup=reply_markup
-            )
-        
-        # Send footer with common actions
-        keyboard = [
-            [
-                InlineKeyboardButton("➕ Add Series", callback_data="command_add"),
-                InlineKeyboardButton("🔄 Check Updates", callback_data="command_check")
-            ],
-            [
-                InlineKeyboardButton("📺 My Watchlist", callback_data="command_watchlist"),
-                InlineKeyboardButton("❓ Help", callback_data="command_help")
-            ]
-        ]
-        reply_markup = InlineKeyboardMarkup(keyboard)
-        context.bot.send_message(
-            chat_id=query.message.chat_id,
-            text="*Actions:*",
-            parse_mode=ParseMode.MARKDOWN,
-            reply_markup=reply_markup
-        )
+            if not user_series_list:
+                logger.info(f"No series found for user {user.id}")
+                # Create keyboard with options
+                keyboard = [
+                    [InlineKeyboardButton("Add Series", callback_data="command_add")],
+                    [InlineKeyboardButton("View Watchlist", callback_data="command_watchlist")],
+                    [InlineKeyboardButton("Help", callback_data="command_help")]
+                ]
+                reply_markup = InlineKeyboardMarkup(keyboard)
+                query.edit_message_text(
+                    "You're not watching any series yet. Use the Add Series button or /add command.",
+                    reply_markup=reply_markup
+                )
+                return
+                
+            # Edit current message to show header
+            query.edit_message_text("*Your TV Series Watchlist:*", parse_mode=ParseMode.MARKDOWN)
+            logger.info("Updated header message")
+            
+            # Send each series as a separate message
+            for user_series, series in user_series_list:
+                try:
+                    year_str = f" ({series.year})" if series.year else ""
+                    message = f"• *{series.name}*{year_str}\n"
+                    message += f"  Currently at: Season {user_series.current_season}, Episode {user_series.current_episode}"
+                    
+                    # Create buttons for updating progress and marking as watched
+                    keyboard = [
+                        [
+                            InlineKeyboardButton(f"📝 Update", callback_data=f"series_{series.tmdb_id}"),
+                            InlineKeyboardButton(f"✅ Watched", callback_data=f"mark_watched_{series.id}")
+                        ]
+                    ]
+                    reply_markup = InlineKeyboardMarkup(keyboard)
+                    
+                    context.bot.send_message(
+                        chat_id=query.message.chat_id,
+                        text=message,
+                        parse_mode=ParseMode.MARKDOWN,
+                        reply_markup=reply_markup
+                    )
+                    logger.info(f"Sent message for series: {series.name}")
+                except Exception as e:
+                    logger.error(f"Error sending message for series {series.name}: {e}")
+            
+            # Send footer with common actions
+            try:
+                keyboard = [
+                    [
+                        InlineKeyboardButton("➕ Add Series", callback_data="command_add"),
+                        InlineKeyboardButton("🔄 Check Updates", callback_data="command_check")
+                    ],
+                    [
+                        InlineKeyboardButton("📺 My Watchlist", callback_data="command_watchlist"),
+                        InlineKeyboardButton("❓ Help", callback_data="command_help")
+                    ]
+                ]
+                reply_markup = InlineKeyboardMarkup(keyboard)
+                context.bot.send_message(
+                    chat_id=query.message.chat_id,
+                    text="*Actions:*",
+                    parse_mode=ParseMode.MARKDOWN,
+                    reply_markup=reply_markup
+                )
+                logger.info("Sent footer message with actions")
+            except Exception as e:
+                logger.error(f"Error sending footer message: {e}")
+        except Exception as e:
+            logger.error(f"Error in list_series_callback: {e}", exc_info=True)
+            query.answer("An error occurred. Please try again.")
         
     def check_updates_callback(self, update: Update, context: CallbackContext) -> None:
         """Check updates from callback query"""
         query = update.callback_query
+        logger.info("Processing check updates callback")
         
         # Run a manual check
         result = self.scheduler.manual_check(query.from_user.id)
+        logger.info(f"Manual check result for user {query.from_user.id}: {result}")
         
         # Add buttons for after check
         keyboard = [
@@ -654,20 +654,31 @@ class SeriesTrackerBot:
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
         
-        query.edit_message_text(result, reply_markup=reply_markup)
+        try:
+            query.edit_message_text(result, reply_markup=reply_markup)
+        except Exception as e:
+            logger.error(f"Error updating message with check results: {e}")
         
     def move_to_watchlist(self, update: Update, context: CallbackContext) -> None:
         """Move a series from watching to watchlist"""
         query = update.callback_query
+        logger.info(f"Processing move to watchlist callback: {query.data}")
         query.answer()
         
         # Extract series ID from callback data
-        series_id = int(query.data.split("_")[2])
+        try:
+            series_id = int(query.data.split("_")[2])
+            logger.info(f"Moving series ID {series_id} to watchlist")
+        except (IndexError, ValueError) as e:
+            logger.error(f"Error parsing series ID from callback data: {query.data}, error: {e}")
+            query.edit_message_text("Error processing your request. Please try again.")
+            return
         
         # Get user
         user = self.db.get_user(query.from_user.id)
         
         if not user:
+            logger.error(f"User not found for telegram_id: {query.from_user.id}")
             query.edit_message_text("Error: User not found.")
             return
             
@@ -681,6 +692,7 @@ class SeriesTrackerBot:
                 
         # Move the series to watchlist
         if self.db.move_to_watchlist(user.id, series_id):
+            logger.info(f"Successfully moved series {series_id} to watchlist for user {user.id}")
             if series:
                 # Create buttons for next actions
                 keyboard = [
@@ -702,6 +714,7 @@ class SeriesTrackerBot:
             else:
                 query.edit_message_text("Series has been moved to your watchlist.")
         else:
+            logger.error(f"Failed to move series {series_id} to watchlist for user {user.id}")
             query.edit_message_text("Error moving series. Please try again later.")
         
     def list_watched(self, update: Update, context: CallbackContext):
