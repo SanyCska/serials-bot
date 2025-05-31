@@ -1,0 +1,56 @@
+name: CD
+
+on:
+  workflow_dispatch:
+
+env:
+  PROJECT_DIR: ./serials-bot
+
+jobs:
+  pull:
+    name: updating project repo
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: connect and pull
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          port: 22
+          script: |
+            cd ${{ env.PROJECT_DIR }}
+            git pull
+
+
+  deploy_server:
+    name: deploy server
+    runs-on: ubuntu-latest
+    needs: pull
+
+    steps:
+      - name: stop service and remove image
+        if: ${{ failure() != true }}
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          port: 22
+          script: |
+            cd ${{ env.PROJECT_DIR }}
+            docker compose rm -sf bot
+            docker rmi serials-bot-bot
+
+      - name: build and run service
+        if: ${{ failure() != true }}
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          port: 22
+          script: |
+            cd ${{ env.PROJECT_DIR }}
+            docker compose up -d bot
