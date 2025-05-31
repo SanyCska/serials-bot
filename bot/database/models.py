@@ -3,6 +3,10 @@ from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship, sessionmaker
 import datetime
 import os
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv()
 
 Base = declarative_base()
 
@@ -59,15 +63,28 @@ class UserSeries(Base):
         return f"<UserSeries(user_id='{self.user_id}', series_id='{self.series_id}', current_season='{self.current_season}', current_episode='{self.current_episode}')>"
 
 
-# Create engine and session
-def get_engine(db_path="sqlite:///bot/database/serials.db"):
-    return create_engine(db_path)
+def get_database_url():
+    """Get database URL from environment variables or use default."""
+    db_user = os.getenv('POSTGRES_USER', 'postgres')
+    db_password = os.getenv('POSTGRES_PASSWORD', 'postgres')
+    db_host = os.getenv('POSTGRES_HOST', 'localhost')
+    db_port = os.getenv('POSTGRES_PORT', '5432')
+    db_name = os.getenv('POSTGRES_DB', 'serials_bot')
+    
+    return f"postgresql://{db_user}:{db_password}@{db_host}:{db_port}/{db_name}"
+
+def get_engine():
+    """Create database engine."""
+    database_url = get_database_url()
+    return create_engine(database_url)
 
 def get_session():
+    """Create database session."""
     engine = get_engine()
     Session = sessionmaker(bind=engine)
     return Session()
 
 def init_db():
+    """Initialize database tables."""
     engine = get_engine()
     Base.metadata.create_all(engine) 

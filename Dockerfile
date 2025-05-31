@@ -9,6 +9,7 @@ RUN apt-get update && \
     gcc \
     python3-dev \
     libpq-dev \
+    postgresql-client \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy requirements first to leverage Docker cache
