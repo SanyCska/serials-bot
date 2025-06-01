@@ -95,7 +95,6 @@ class SeriesTrackerBot:
             ('list', 'List all TV series you are watching'),
             ('update', 'Update your progress on a series'),
             ('remove', 'Remove a series from your watchlist'),
-            ('check', 'Check for new episodes or seasons'),
             ('watchlist', 'View your future watchlist'),
             ('addwatch', 'Add a series to your future watchlist'),
             ('watched', 'List all watched series'),
@@ -127,7 +126,7 @@ class SeriesTrackerBot:
                 SELECTING_SERIES: [
                     MessageHandler(Filters.text & ~Filters.command, self.conversation_manager.search_series),
                     CallbackQueryHandler(self.conversation_manager.series_selected, pattern=f"^{SERIES_PATTERN.format('.*')}$"),
-                    CallbackQueryHandler(self.conversation_manager.manual_series_name_entered, pattern=f"^{MANUAL_ADD_PATTERN}$")
+                    CallbackQueryHandler(self.conversation_manager.manual_series_name_prompt, pattern=f"^{MANUAL_ADD_PATTERN}$")
                 ],
                 MANUAL_SERIES_NAME: [
                     MessageHandler(Filters.text & ~Filters.command, self.conversation_manager.manual_series_name_entered)
@@ -200,7 +199,7 @@ class SeriesTrackerBot:
         self.dispatcher.add_handler(CallbackQueryHandler(self.conversation_manager.handle_watchlist_actions, pattern="^(move_watching_|watchlist_series_)"))
         
         # Mark watched handlers
-        self.dispatcher.add_handler(CallbackQueryHandler(self.conversation_manager.mark_watched_selected, pattern="^watched_"))
+        self.dispatcher.add_handler(CallbackQueryHandler(self.mark_watched_callback, pattern="^mark_watched_"))
         
         # Add error handler
         self.dispatcher.add_error_handler(self.error_handler)
@@ -224,7 +223,6 @@ class SeriesTrackerBot:
                 InlineKeyboardButton("My List", callback_data="command_list")
             ],
             [
-                InlineKeyboardButton("Check Updates", callback_data="command_check"),
                 InlineKeyboardButton("My Watchlist", callback_data="command_watchlist")
             ],
             [
@@ -255,7 +253,6 @@ class SeriesTrackerBot:
                 InlineKeyboardButton("Remove Series", callback_data="command_remove")
             ],
             [
-                InlineKeyboardButton("Check Updates", callback_data="command_check"),
                 InlineKeyboardButton("My Watchlist", callback_data="command_watchlist")
             ],
             [
@@ -271,8 +268,6 @@ class SeriesTrackerBot:
             "/list - List all TV series you're currently watching\n"
             "/update - Update your progress on a series\n"
             "/remove - Remove a series from your list\n"
-            "/check - Check for new episodes or seasons\n\n"
-            "*Watchlist (Series to Watch Later)*\n"
             "/watchlist - View series in your future watchlist\n"
             "/addwatch - Add a series to your future watchlist\n\n"
             "/watched - List all watched series\n"
@@ -341,10 +336,9 @@ class SeriesTrackerBot:
                 message = f"• *{series.name}*{year_str}\n"
                 message += f"  Currently at: Season {user_series.current_season}, Episode {user_series.current_episode}"
                 
-                # Create buttons for updating progress and marking as watched
+                # Only show the 'Watched' button for each series
                 keyboard = [
                     [
-                        InlineKeyboardButton(f"📝 Update", callback_data=f"series_{series.tmdb_id}"),
                         InlineKeyboardButton(f"✅ Watched", callback_data=f"mark_watched_{series.id}")
                     ]
                 ]
@@ -360,7 +354,7 @@ class SeriesTrackerBot:
             keyboard = [
                 [
                     InlineKeyboardButton("➕ Add Series", callback_data="command_add"),
-                    InlineKeyboardButton("🔄 Check Updates", callback_data="command_check")
+                    InlineKeyboardButton("📝 Update Progress", callback_data="command_update")
                 ],
                 [
                     InlineKeyboardButton("📺 My Watchlist", callback_data="command_watchlist"),
@@ -372,15 +366,6 @@ class SeriesTrackerBot:
             logger.info("Sent footer message with actions")
         except Exception as e:
             logger.error(f"Error sending footer message: {e}")
-        
-    def check_updates(self, update: Update, context: CallbackContext) -> None:
-        """Manually check for updates."""
-        update.message.reply_text("Checking for new episodes and seasons...")
-        
-        # Run a manual check
-        result = self.scheduler.manual_check(update.effective_user.id)
-        
-        update.message.reply_text(result)
         
     def remove_series(self, update: Update, context: CallbackContext) -> int:
         """Remove a series from the user's watchlist."""
@@ -587,10 +572,9 @@ class SeriesTrackerBot:
                     message = f"• *{series.name}*{year_str}\n"
                     message += f"  Currently at: Season {user_series.current_season}, Episode {user_series.current_episode}"
                     
-                    # Create buttons for updating progress and marking as watched
+                    # Only show the 'Watched' button for each series
                     keyboard = [
                         [
-                            InlineKeyboardButton(f"📝 Update", callback_data=f"series_{series.tmdb_id}"),
                             InlineKeyboardButton(f"✅ Watched", callback_data=f"mark_watched_{series.id}")
                         ]
                     ]
@@ -611,7 +595,7 @@ class SeriesTrackerBot:
                 keyboard = [
                     [
                         InlineKeyboardButton("➕ Add Series", callback_data="command_add"),
-                        InlineKeyboardButton("🔄 Check Updates", callback_data="command_check")
+                        InlineKeyboardButton("📝 Update Progress", callback_data="command_update")
                     ],
                     [
                         InlineKeyboardButton("📺 My Watchlist", callback_data="command_watchlist"),
@@ -636,11 +620,9 @@ class SeriesTrackerBot:
         """Check updates from callback query"""
         query = update.callback_query
         logger.info("Processing check updates callback")
-        
         # Run a manual check
         result = self.scheduler.manual_check(query.from_user.id)
         logger.info(f"Manual check result for user {query.from_user.id}: {result}")
-        
         # Add buttons for after check
         keyboard = [
             [
@@ -653,7 +635,6 @@ class SeriesTrackerBot:
             ]
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
-        
         try:
             query.edit_message_text(result, reply_markup=reply_markup)
         except Exception as e:
@@ -797,20 +778,7 @@ class SeriesTrackerBot:
             if self.db.mark_as_watched(user.id, series_id):
                 message = f"✅ I've marked '{series_name}' as watched and moved it to your watched list!"
                 
-                # Create buttons for next actions
-                keyboard = [
-                    [
-                        InlineKeyboardButton("📺 View Watching", callback_data="command_list"),
-                        InlineKeyboardButton("👁 View Watched", callback_data="command_watched")
-                    ],
-                    [
-                        InlineKeyboardButton("➕ Add Series", callback_data="command_add"),
-                        InlineKeyboardButton("❓ Help", callback_data="command_help")
-                    ]
-                ]
-                reply_markup = InlineKeyboardMarkup(keyboard)
-                
-                query.edit_message_text(message, reply_markup=reply_markup)
+                query.edit_message_text(message)
             else:
                 query.edit_message_text("Error marking series as watched. Please try again later.")
         except Exception as e:

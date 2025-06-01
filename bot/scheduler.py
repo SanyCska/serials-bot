@@ -132,41 +132,4 @@ class NotificationScheduler:
                     self.bot.send_message(chat_id=telegram_id, text=message, parse_mode='Markdown')
                     
         except Exception as e:
-            logger.error(f"Error sending notification: {e}")
-            
-    def manual_check(self, user_id):
-        """Manually check for updates for a specific user"""
-        logger.info(f"Manual update check for user {user_id}")
-        
-        try:
-            user = self.db.get_user(user_id)
-            if not user:
-                return "You're not registered in the system."
-                
-            user_series_list = self.db.get_user_series_list(user.id)
-            
-            if not user_series_list:
-                return "You're not watching any series yet."
-                
-            updates_found = False
-            
-            for user_series, series in user_series_list:
-                # Check for new episodes/seasons for this series
-                # Use a more recent check date for manual checks (1 day ago)
-                last_check = datetime.utcnow() - timedelta(days=1)
-                
-                new_content = self.tmdb.check_new_episodes(series.tmdb_id, last_check)
-                
-                # If there's new content, notify the user
-                if new_content:
-                    updates_found = True
-                    self._send_notifications(user, series, new_content)
-                    
-            if updates_found:
-                return "You have new episodes or seasons! Check your notifications."
-            else:
-                return "No new episodes or seasons were found for your series."
-                
-        except Exception as e:
-            logger.error(f"Error in manual check: {e}")
-            return "An error occurred while checking for updates." 
+            logger.error(f"Error sending notification: {e}") 

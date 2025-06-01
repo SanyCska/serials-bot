@@ -188,7 +188,6 @@ POSTGRES_DB=your_render_db_name
 - `/list` - List all TV series you are watching
 - `/update` - Update your progress on a series
 - `/remove` - Remove a series from your watchlist
-- `/check` - Check for new episodes or seasons
 - `/watchlist` - View your future watchlist
 - `/addwatch` - Add a series to your future watchlist
 - `/watched` - List all watched series
