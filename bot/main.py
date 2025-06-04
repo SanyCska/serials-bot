@@ -91,12 +91,12 @@ class SeriesTrackerBot:
         bot_commands = [
             ('start', 'Start the bot'),
             ('help', 'Show help message'),
-            ('add', 'Add a new TV series to your watchlist'),
-            ('list', 'List all TV series you are watching'),
-            ('watchlist', 'View your future watchlist'),
-            ('addwatch', 'Add a series to your future watchlist'),
-            ('watched', 'List all watched series'),
-            ('addwatched', 'Add a new watched series'),
+            ('addinwatchlist', "Add a new series you're watching"),
+            ('watchlist', 'Series in progress'),
+            # ('watchlater', 'Add series you plan to watch'),
+            # ('addinwatchlater', 'Add a series you plan to watch'),
+            # ('watched', 'List all watched series'),
+            # ('addwatched', 'Add a new watched series'),
         ]
         
         self.updater.bot.set_my_commands(bot_commands)
@@ -107,9 +107,9 @@ class SeriesTrackerBot:
         # Command handlers
         self.dispatcher.add_handler(CommandHandler("start", self.start))
         self.dispatcher.add_handler(CommandHandler("help", self.help_command))
-        self.dispatcher.add_handler(CommandHandler("addwatch", self.conversation_manager.add_to_watchlist_start))
-        self.dispatcher.add_handler(CommandHandler("list", self.list_series))
-        self.dispatcher.add_handler(CommandHandler("watchlist", self.conversation_manager.view_watchlist_start))
+        self.dispatcher.add_handler(CommandHandler("watchlist", self.list_series))
+        self.dispatcher.add_handler(CommandHandler("watchlater", self.conversation_manager.view_watchlist_start))
+        self.dispatcher.add_handler(CommandHandler("addinwatchlater", self.conversation_manager.add_to_watchlist_start))
         self.dispatcher.add_handler(CommandHandler("addwatched", self.conversation_manager.add_watched_series_start))
         self.dispatcher.add_handler(CommandHandler("markwatched", self.conversation_manager.mark_watched_start))
         
@@ -117,6 +117,7 @@ class SeriesTrackerBot:
         add_series_conv = ConversationHandler(
             entry_points=[
                 CommandHandler("add", self.conversation_manager.add_series_start),
+                CommandHandler("addinwatchlist", self.conversation_manager.add_series_start),
                 CallbackQueryHandler(self.conversation_manager.add_series_start, pattern="^command_add$")
             ],
             states={
@@ -194,7 +195,7 @@ class SeriesTrackerBot:
         
         # Remove series handlers
         self.dispatcher.add_handler(CallbackQueryHandler(self.remove_series_callback, pattern="^remove_series_"))
-        
+
         # Add error handler
         self.dispatcher.add_error_handler(self.error_handler)
         
@@ -213,12 +214,12 @@ class SeriesTrackerBot:
         # Create inline keyboard with primary commands
         keyboard = [
             [
-                InlineKeyboardButton("Add Series", callback_data="command_add"),
-                InlineKeyboardButton("My List", callback_data="command_list")
+                InlineKeyboardButton("Add series in watchlist", callback_data="command_add"),
+                InlineKeyboardButton("Series in progress", callback_data="command_list")
             ],
-            [
-                InlineKeyboardButton("My Watchlist", callback_data="command_watchlist")
-            ],
+            # [
+            #     InlineKeyboardButton("Watch later", callback_data="command_watchlist")
+            # ],
             [
                 InlineKeyboardButton("Help", callback_data="command_help")
             ]
@@ -227,9 +228,8 @@ class SeriesTrackerBot:
         
         update.message.reply_text(
             f"Hello {user.first_name}! 👋\n\n"
-            f"I'm your personal TV Series Tracker. I'll help you keep track of which TV shows you're watching "
-            f"and notify you when new episodes or seasons are released.\n\n"
-            f"You can also maintain a watchlist of series you plan to watch in the future.\n\n"
+            f"I'm your personal TV Series Tracker. I'll help you keep track of which TV shows you're watching. "
+            f"In future we will add possibility to save series you plan to watch and check the list of already watched series.\n\n"
             f"You can access all commands by clicking the menu button in our chat or by using the buttons below:",
             reply_markup=reply_markup
         )
@@ -239,12 +239,12 @@ class SeriesTrackerBot:
         # Create inline keyboard with primary commands
         keyboard = [
             [
-                InlineKeyboardButton("Add Series", callback_data="command_add"),
-                InlineKeyboardButton("My List", callback_data="command_list")
+                InlineKeyboardButton("Add series in watchlist", callback_data="command_add"),
+                InlineKeyboardButton("Series in progress", callback_data="command_list")
             ],
-            [
-                InlineKeyboardButton("My Watchlist", callback_data="command_watchlist")
-            ],
+            # [
+            #     InlineKeyboardButton("Watch later", callback_data="command_watchlist")
+            # ],
             [
                 InlineKeyboardButton("Help", callback_data="command_help")
             ]
@@ -254,12 +254,12 @@ class SeriesTrackerBot:
         help_text = (
             "Here are the commands you can use:\n\n"
             "*Tracking Series You're Watching*\n"
-            "/add - Add a new TV series to track your watching progress\n"
-            "/list - List all TV series you're currently watching\n"
-            "/watchlist - View series in your future watchlist\n"
-            "/addwatch - Add a series to your future watchlist\n\n"
-            "/watched - List all watched series\n"
-            "/addwatched - Add a new watched series\n\n"
+            "/addinwatchlist - Add a new TV series to track your watching progress\n"
+            "/watchlist - List all TV series you're currently watching\n"
+            # "/watchlist - View series in your future watchlist\n"
+            # "/addwatch - Add a series to your future watchlist\n\n"
+            # "/watched - List all watched series\n"
+            # "/addwatched - Add a new watched series\n\n"
             "/help - Show this help message\n\n"
             "You can also access these commands anytime by clicking the menu button (☰) in our chat."
         )
@@ -281,7 +281,7 @@ class SeriesTrackerBot:
             # Create keyboard with options
             keyboard = [
                 [InlineKeyboardButton("Add Series", callback_data="command_add")],
-                [InlineKeyboardButton("View Watchlist", callback_data="command_watchlist")],
+                [InlineKeyboardButton("Watch later", callback_data="command_watchlist")],
                 [InlineKeyboardButton("Help", callback_data="command_help")]
             ]
             reply_markup = InlineKeyboardMarkup(keyboard)
@@ -299,12 +299,12 @@ class SeriesTrackerBot:
             # Create keyboard with options
             keyboard = [
                 [InlineKeyboardButton("Add Series", callback_data="command_add")],
-                [InlineKeyboardButton("View Watchlist", callback_data="command_watchlist")],
+                [InlineKeyboardButton("Watch later", callback_data="command_watchlist")],
                 [InlineKeyboardButton("Help", callback_data="command_help")]
             ]
             reply_markup = InlineKeyboardMarkup(keyboard)
             update.message.reply_text(
-                "You're not watching any series yet. Use /add command or the button below.",
+                "You're not watching any series yet. Use /addinwatchlist command or the button below.",
                 reply_markup=reply_markup
             )
             return
@@ -346,7 +346,7 @@ class SeriesTrackerBot:
                     InlineKeyboardButton("📝 Update Progress", callback_data="command_update")
                 ],
                 [
-                    InlineKeyboardButton("📺 My Watchlist", callback_data="command_watchlist"),
+                    InlineKeyboardButton("📺 Watch later", callback_data="command_watchlist"),
                     InlineKeyboardButton("❓ Help", callback_data="command_help")
                 ]
             ]
@@ -480,7 +480,7 @@ class SeriesTrackerBot:
                 # Create keyboard with options
                 keyboard = [
                     [InlineKeyboardButton("Add Series", callback_data="command_add")],
-                    [InlineKeyboardButton("View Watchlist", callback_data="command_watchlist")],
+                    [InlineKeyboardButton("Watch later", callback_data="command_watchlist")],
                     [InlineKeyboardButton("Help", callback_data="command_help")]
                 ]
                 reply_markup = InlineKeyboardMarkup(keyboard)
@@ -498,12 +498,12 @@ class SeriesTrackerBot:
                 # Create keyboard with options
                 keyboard = [
                     [InlineKeyboardButton("Add Series", callback_data="command_add")],
-                    [InlineKeyboardButton("View Watchlist", callback_data="command_watchlist")],
+                    [InlineKeyboardButton("Watch later", callback_data="command_watchlist")],
                     [InlineKeyboardButton("Help", callback_data="command_help")]
                 ]
                 reply_markup = InlineKeyboardMarkup(keyboard)
                 query.edit_message_text(
-                    "You're not watching any series yet. Use the Add Series button or /add command.",
+                    "You're not watching any series yet. Use /addinwatchlist command or the button below.",
                     reply_markup=reply_markup
                 )
                 return
@@ -545,7 +545,7 @@ class SeriesTrackerBot:
                         InlineKeyboardButton("📝 Update Progress", callback_data="command_update")
                     ],
                     [
-                        InlineKeyboardButton("📺 My Watchlist", callback_data="command_watchlist"),
+                        InlineKeyboardButton("📺 Watch later", callback_data="command_watchlist"),
                         InlineKeyboardButton("❓ Help", callback_data="command_help")
                     ]
                 ]
@@ -625,7 +625,7 @@ class SeriesTrackerBot:
                 # Create buttons for next actions
                 keyboard = [
                     [
-                        InlineKeyboardButton("View Watchlist", callback_data="command_watchlist"),
+                        InlineKeyboardButton("Watch later", callback_data="command_watchlist"),
                         InlineKeyboardButton("My Series", callback_data="command_list")
                     ],
                     [
@@ -660,7 +660,7 @@ class SeriesTrackerBot:
             keyboard = [
                 [InlineKeyboardButton("Add Watched Series", callback_data="command_addwatched")],
                 [InlineKeyboardButton("View Watching List", callback_data="command_list")],
-                [InlineKeyboardButton("View Watchlist", callback_data="command_watchlist")]
+                [InlineKeyboardButton("Watch later", callback_data="command_watchlist")]
             ]
             reply_markup = InlineKeyboardMarkup(keyboard)
             
@@ -688,7 +688,7 @@ class SeriesTrackerBot:
             InlineKeyboardButton("View Watching", callback_data="command_list")
         ])
         keyboard.append([
-            InlineKeyboardButton("View Watchlist", callback_data="command_watchlist"),
+            InlineKeyboardButton("Watch later", callback_data="command_watchlist"),
             InlineKeyboardButton("Help", callback_data="command_help")
         ])
         

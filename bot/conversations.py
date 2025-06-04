@@ -172,8 +172,12 @@ class ConversationManager:
                 series_details.get('year'),
                 series_details.get('total_seasons')
             )
-            # Add to user's watchlist if not already present
-            self.db.add_user_series(user.id, local_series.id)
+            # Add to user's watchlist or watching list depending on context
+            if context.user_data.get('add_to_watchlist'):
+                self.db.add_user_series(user.id, local_series.id, in_watchlist=True)
+                context.user_data.pop('add_to_watchlist', None)
+            else:
+                self.db.add_user_series(user.id, local_series.id)
             # Use the local PK for all further steps
             series_id = local_series.id
 
@@ -510,11 +514,11 @@ class ConversationManager:
         # Handle callback query case
         if update.callback_query:
             update.callback_query.edit_message_text(
-                "Please send me the name of the TV series you want to add to your watchlist."
+                "Please send me the name of the series you want to add to your watch later list."
             )
         else:
             update.message.reply_text(
-                "Please send me the name of the TV series you want to add to your watchlist."
+                "Please send me the name of the series you want to add to your watch later list."
             )
         
         # Set flag to indicate watchlist operation
@@ -542,13 +546,13 @@ class ConversationManager:
         if not user_series_list:
             # Create keyboard with options
             keyboard = [
-                [InlineKeyboardButton("Add to Watchlist", callback_data="command_addwatch")],
+                [InlineKeyboardButton("Add in Watch later list", callback_data="command_addwatch")],
                 [InlineKeyboardButton("View Watching List", callback_data="command_list")],
                 [InlineKeyboardButton("Help", callback_data="command_help")]
             ]
             reply_markup = InlineKeyboardMarkup(keyboard)
             
-            message = "Your watchlist is empty. Use /addwatch to add series you plan to watch."
+            message = "Your Watch Later list is empty. Use /addinwatchlater to add series you plan to watch."
             if update.callback_query:
                 update.callback_query.answer()
                 update.callback_query.edit_message_text(message, reply_markup=reply_markup)
@@ -922,8 +926,12 @@ class ConversationManager:
                 context.user_data["manual_series_seasons"]
             )
             
-            # Add to user's watchlist
-            self.db.add_user_series(user.id, series.id)
+            # Add to user's watchlist or watching list depending on context
+            if context.user_data.get('add_to_watchlist'):
+                self.db.add_user_series(user.id, series.id, in_watchlist=True)
+                context.user_data.pop('add_to_watchlist', None)
+            else:
+                self.db.add_user_series(user.id, series.id)
             
             # Create keyboard for season selection
             keyboard = []
@@ -1038,3 +1046,7 @@ class ConversationManager:
         )
         context.user_data["selected_series_id"] = series_id
         return SELECTING_SEASON 
+
+    def search_watchlist_series(self, update: Update, context: CallbackContext) -> int:
+        """Search for a series to add to the watch later list."""
+        return self.search_series(update, context, query=update.message.text, is_watched=False) 

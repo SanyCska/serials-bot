@@ -150,7 +150,7 @@ class DBHandler:
             elif watched_only:
                 query = query.filter(UserSeries.user_id == user_id, UserSeries.is_watched == True)
             else:
-                query = query.filter(UserSeries.user_id == user_id, UserSeries.in_watchlist == False)
+                query = query.filter(UserSeries.user_id == user_id, UserSeries.in_watchlist == False, UserSeries.is_watched == False)
                 
             result = query.all()
             logger.info(f"Found {len(result)} series for user {user_id}")
