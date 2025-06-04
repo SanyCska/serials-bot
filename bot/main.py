@@ -93,8 +93,6 @@ class SeriesTrackerBot:
             ('help', 'Show help message'),
             ('add', 'Add a new TV series to your watchlist'),
             ('list', 'List all TV series you are watching'),
-            ('update', 'Update your progress on a series'),
-            ('remove', 'Remove a series from your watchlist'),
             ('watchlist', 'View your future watchlist'),
             ('addwatch', 'Add a series to your future watchlist'),
             ('watched', 'List all watched series'),
@@ -112,7 +110,6 @@ class SeriesTrackerBot:
         self.dispatcher.add_handler(CommandHandler("addwatch", self.conversation_manager.add_to_watchlist_start))
         self.dispatcher.add_handler(CommandHandler("list", self.list_series))
         self.dispatcher.add_handler(CommandHandler("watchlist", self.conversation_manager.view_watchlist_start))
-        self.dispatcher.add_handler(CommandHandler("remove", self.conversation_manager.remove_series_start))
         self.dispatcher.add_handler(CommandHandler("addwatched", self.conversation_manager.add_watched_series_start))
         self.dispatcher.add_handler(CommandHandler("markwatched", self.conversation_manager.mark_watched_start))
         
@@ -155,42 +152,36 @@ class SeriesTrackerBot:
             fallbacks=[CommandHandler("cancel", self.conversation_manager.cancel)]
         )
         
-        # Update series conversation handler
-        update_series_conv = ConversationHandler(
+        # Add the conversation handler to dispatcher
+        self.dispatcher.add_handler(add_series_conv)
+        
+        # Update progress conversation handler
+        update_progress_conv = ConversationHandler(
             entry_points=[
-                CommandHandler("update", self.conversation_manager.update_series_start),
-                CallbackQueryHandler(self.conversation_manager.update_series_start, pattern="^command_update$"),
-                CallbackQueryHandler(self.conversation_manager.update_series_start, pattern="^series_")
+                CallbackQueryHandler(self.conversation_manager.update_progress_start, pattern="^command_update$")
             ],
             states={
                 SELECTING_SERIES: [
-                    CallbackQueryHandler(self.conversation_manager.series_selected, pattern=f"^{SERIES_PATTERN.format('.*')}$"),
-                    CallbackQueryHandler(self.conversation_manager.cancel, pattern=f"^{CANCEL_PATTERN}$")
+                    CallbackQueryHandler(self.conversation_manager.update_progress_series_selected, pattern="^update_series_.*$")
                 ],
                 SELECTING_SEASON: [
                     CallbackQueryHandler(self.conversation_manager.season_selected, pattern=f"^{SEASON_PATTERN.format('.*', '.*')}$"),
-                    CallbackQueryHandler(self.conversation_manager.manual_season_entry, pattern=f"^{MANUAL_SEASON_PATTERN.format('.*')}$"),
-                    CallbackQueryHandler(self.conversation_manager.cancel, pattern=f"^{CANCEL_PATTERN}$")
+                    CallbackQueryHandler(self.conversation_manager.manual_season_entry, pattern=f"^{MANUAL_SEASON_PATTERN.format('.*')}$")
                 ],
                 MANUAL_SEASON_ENTRY: [
                     MessageHandler(Filters.text & ~Filters.command, self.conversation_manager.manual_season_entry)
                 ],
                 SELECTING_EPISODE: [
                     CallbackQueryHandler(self.conversation_manager.episode_selected, pattern=f"^{EPISODE_PATTERN.format('.*', '.*', '.*')}$"),
-                    CallbackQueryHandler(self.conversation_manager.manual_episode_entry, pattern=f"^{MANUAL_ENTRY_PATTERN.format('.*', '.*')}$"),
-                    CallbackQueryHandler(self.conversation_manager.cancel, pattern=f"^{CANCEL_PATTERN}$")
+                    CallbackQueryHandler(self.conversation_manager.manual_episode_entry, pattern=f"^{MANUAL_ENTRY_PATTERN.format('.*', '.*')}$")
                 ],
                 MANUAL_EPISODE_ENTRY: [
-                    MessageHandler(Filters.text & ~Filters.command, self.conversation_manager.manual_episode_entry),
-                    CallbackQueryHandler(self.conversation_manager.manual_episode_entry, pattern=f"^{MANUAL_ENTRY_PATTERN.format('.*', '.*')}$")
+                    MessageHandler(Filters.text & ~Filters.command, self.conversation_manager.manual_episode_entry)
                 ]
             },
             fallbacks=[CommandHandler("cancel", self.conversation_manager.cancel)]
         )
-        
-        # Add both conversation handlers
-        self.dispatcher.add_handler(add_series_conv)
-        self.dispatcher.add_handler(update_series_conv)
+        self.dispatcher.add_handler(update_progress_conv)
         
         # Command button handlers
         self.dispatcher.add_handler(CallbackQueryHandler(self.handle_command_button, pattern="^command_"))
@@ -249,14 +240,10 @@ class SeriesTrackerBot:
                 InlineKeyboardButton("My List", callback_data="command_list")
             ],
             [
-                InlineKeyboardButton("Update Progress", callback_data="command_update"),
-                InlineKeyboardButton("Remove Series", callback_data="command_remove")
-            ],
-            [
                 InlineKeyboardButton("My Watchlist", callback_data="command_watchlist")
             ],
             [
-                InlineKeyboardButton("Add to Watchlist", callback_data="command_addwatch")
+                InlineKeyboardButton("Help", callback_data="command_help")
             ]
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
@@ -266,8 +253,6 @@ class SeriesTrackerBot:
             "*Tracking Series You're Watching*\n"
             "/add - Add a new TV series to track your watching progress\n"
             "/list - List all TV series you're currently watching\n"
-            "/update - Update your progress on a series\n"
-            "/remove - Remove a series from your list\n"
             "/watchlist - View series in your future watchlist\n"
             "/addwatch - Add a series to your future watchlist\n\n"
             "/watched - List all watched series\n"
@@ -367,44 +352,6 @@ class SeriesTrackerBot:
         except Exception as e:
             logger.error(f"Error sending footer message: {e}")
         
-    def remove_series(self, update: Update, context: CallbackContext) -> int:
-        """Remove a series from the user's watchlist."""
-        query = update.callback_query
-        query.answer()
-        
-        if query.data == CANCEL_PATTERN:
-            query.edit_message_text("Operation cancelled.")
-            return ConversationHandler.END
-            
-        # Extract series ID from callback data
-        series_id = int(query.data.split("_")[1])
-        
-        # Get user
-        user = self.db.get_user(query.from_user.id)
-        
-        if not user:
-            query.edit_message_text("Error: User not found.")
-            return ConversationHandler.END
-            
-        # Get series name first for the success message
-        series = None
-        user_series_list = self.db.get_user_series_list(user.id)
-        for user_series, s in user_series_list:
-            if s.id == series_id:
-                series = s
-                break
-                
-        # Remove the series from user's watchlist
-        if self.db.remove_user_series(user.id, series_id):
-            if series:
-                query.edit_message_text(f"I've removed '{series.name}' from your watchlist.")
-            else:
-                query.edit_message_text("Series has been removed from your watchlist.")
-        else:
-            query.edit_message_text("Error removing series. Please try again later.")
-            
-        return ConversationHandler.END
-        
     def error_handler(self, update: Update, context: CallbackContext) -> None:
         """Log errors caused by updates."""
         logger.error(f"Update {update} caused error {context.error}")
@@ -499,10 +446,6 @@ class SeriesTrackerBot:
             logger.info("Showing watchlist...")
             query.answer("Showing watchlist...")
             return self.conversation_manager.view_watchlist_start(update, context)
-        elif command == 'update':
-            logger.info("Starting update series process...")
-            query.answer("Starting update series process...")
-            return self.conversation_manager.update_series_start(update, context)
         elif command == 'help':
             logger.info("Showing help...")
             query.answer("Showing help...")
@@ -511,10 +454,10 @@ class SeriesTrackerBot:
             logger.info("Starting add watched series process...")
             query.answer("Starting add watched series process...")
             return self.conversation_manager.add_watched_series_start(update, context)
-        elif command == 'markwatched':
-            logger.info("Starting mark as watched process...")
-            query.answer("Starting mark as watched process...")
-            return self.conversation_manager.mark_watched_start(update, context)
+        elif command == 'update':
+            logger.info("Starting update progress process...")
+            query.answer("Starting update progress process...")
+            return self.conversation_manager.update_progress_start(update, context)
         else:
             logger.warning(f"Unknown command button: {command}")
             query.answer("Unknown command")

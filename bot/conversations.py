@@ -157,10 +157,39 @@ class ConversationManager:
         # Get series details from TMDB
         series_details = self.tmdb.get_series_details(series_id)
         
-        if not series_details:
+        # Always add the series to the local DB and add the user to the series (if not already present)
+        user = self.db.add_user(
+            query.from_user.id,
+            query.from_user.username,
+            query.from_user.first_name,
+            query.from_user.last_name
+        )
+        if series_details:
+            # Add series to DB
+            local_series = self.db.add_series(
+                series_details['id'],
+                series_details['name'],
+                series_details.get('year'),
+                series_details.get('total_seasons')
+            )
+            # Add to user's watchlist if not already present
+            self.db.add_user_series(user.id, local_series.id)
+            # Use the local PK for all further steps
+            series_id = local_series.id
+
+        keyboard = []
+        if series_details and 'seasons' in series_details and series_details['seasons']:
+            for season in series_details['seasons']:
+                keyboard.append([
+                    InlineKeyboardButton(
+                        f"Season {season['season_number']}",
+                        callback_data=SEASON_PATTERN.format(series_id, season['season_number'])
+                    )
+                ])
+        else:
             # Try to get from local DB (manual series)
-            logger.warning(f"TMDB not found for series ID: {series_id}, trying local DB for manual series.")
-            local_series = self.db.get_series(series_id)
+            logger.warning(f"TMDB not found or no seasons for series ID: {series_id}, trying local DB for manual series.")
+            local_series = self.db.get_series_by_id(series_id)
             if not local_series:
                 logger.error(f"Failed to retrieve manual series details for ID: {series_id}")
                 context.bot.send_message(
@@ -168,64 +197,27 @@ class ConversationManager:
                     text="Error retrieving series details. Please try again later."
                 )
                 return ConversationHandler.END
-            # Save the season number in user_data
-            context.user_data["selected_season"] = {
-                "season_number": season_number,
-                "episodes": []
-            }
-            # Only allow manual episode entry
-            keyboard = [
-                [InlineKeyboardButton(
-                    "Enter episode number manually",
-                    callback_data=MANUAL_ENTRY_PATTERN.format(series_id, season_number)
-                )],
-                [InlineKeyboardButton("Cancel", callback_data=CANCEL_PATTERN)]
-            ]
-            reply_markup = InlineKeyboardMarkup(keyboard)
-            context.bot.send_message(
-                chat_id=query.message.chat_id,
-                text=f"Please enter the episode number for Season {season_number} you are currently watching:",
-                reply_markup=reply_markup
-            )
-            return SELECTING_EPISODE
-        
-        # Get season details
-        season_details = self.tmdb.get_season_details(series_id, season_number)
-        
-        # Save the season number in user_data regardless of whether we got details
-        context.user_data["selected_season"] = {
-            "season_number": season_number,
-            "episodes": []  # Empty list since we don't have episode data
-        }
-        
-        # Create keyboard with manual episode entry option
-        keyboard = [
-            [InlineKeyboardButton(
-                "Enter episode number manually",
-                callback_data=MANUAL_ENTRY_PATTERN.format(series_id, season_number)
-            )],
-            [InlineKeyboardButton("Cancel", callback_data=CANCEL_PATTERN)]
-        ]
-        
-        # If we got season details, add episode buttons
-        if season_details and 'episodes' in season_details:
-            for episode in season_details['episodes']:
-                keyboard.insert(0, [
+            # Use total_seasons from local DB
+            total_seasons = getattr(local_series, 'total_seasons', 1)
+            for season_num in range(1, total_seasons + 1):
+                keyboard.append([
                     InlineKeyboardButton(
-                        f"Episode {episode['episode_number']}: {episode['name']}",
-                        callback_data=EPISODE_PATTERN.format(series_id, season_number, episode['episode_number'])
+                        f"Season {season_num}",
+                        callback_data=SEASON_PATTERN.format(series_id, season_num)
                     )
                 ])
-        
+        # Add a manual season entry option
+        keyboard.append([InlineKeyboardButton("Enter season number manually", callback_data=MANUAL_SEASON_PATTERN.format(series_id))])
+        # Add a cancel button
+        keyboard.append([InlineKeyboardButton("Cancel", callback_data=CANCEL_PATTERN)])
         reply_markup = InlineKeyboardMarkup(keyboard)
-        
-        context.bot.send_message(
-            chat_id=query.message.chat_id,
-            text=f"Which episode of Season {season_number} are you currently watching?",
+        query.edit_message_text(
+            "Which season are you currently watching?",
             reply_markup=reply_markup
         )
-        
-        return SELECTING_EPISODE
+        # Save selected series_id for later steps
+        context.user_data["selected_series_id"] = series_id
+        return SELECTING_SEASON
 
     def season_selected(self, update: Update, context: CallbackContext) -> int:
         """Handle season selection"""
@@ -274,78 +266,18 @@ class ConversationManager:
             )
             return ConversationHandler.END
         
-        # Get series details from TMDB
-        series_details = self.tmdb.get_series_details(series_id)
-        
-        if not series_details:
-            # Try to get from local DB (manual series)
-            logger.warning(f"TMDB not found for series ID: {series_id}, trying local DB for manual series.")
-            local_series = self.db.get_series(series_id)
-            if not local_series:
-                logger.error(f"Failed to retrieve manual series details for ID: {series_id}")
-                context.bot.send_message(
-                    chat_id=query.message.chat_id,
-                    text="Error retrieving series details. Please try again later."
-                )
-                return ConversationHandler.END
-            # Save the season number in user_data
-            context.user_data["selected_season"] = {
-                "season_number": season_number,
-                "episodes": []
-            }
-            # Only allow manual episode entry
-            keyboard = [
-                [InlineKeyboardButton(
-                    "Enter episode number manually",
-                    callback_data=MANUAL_ENTRY_PATTERN.format(series_id, season_number)
-                )],
-                [InlineKeyboardButton("Cancel", callback_data=CANCEL_PATTERN)]
-            ]
-            reply_markup = InlineKeyboardMarkup(keyboard)
-            context.bot.send_message(
-                chat_id=query.message.chat_id,
-                text=f"Please enter the episode number for Season {season_number} you are currently watching:",
-                reply_markup=reply_markup
-            )
-            return SELECTING_EPISODE
-        
-        # Get season details
-        season_details = self.tmdb.get_season_details(series_id, season_number)
-        
-        # Save the season number in user_data regardless of whether we got details
+        # Save the season number in user_data
         context.user_data["selected_season"] = {
             "season_number": season_number,
-            "episodes": []  # Empty list since we don't have episode data
+            "episodes": []
         }
-        
-        # Create keyboard with manual episode entry option
-        keyboard = [
-            [InlineKeyboardButton(
-                "Enter episode number manually",
-                callback_data=MANUAL_ENTRY_PATTERN.format(series_id, season_number)
-            )],
-            [InlineKeyboardButton("Cancel", callback_data=CANCEL_PATTERN)]
-        ]
-        
-        # If we got season details, add episode buttons
-        if season_details and 'episodes' in season_details:
-            for episode in season_details['episodes']:
-                keyboard.insert(0, [
-                    InlineKeyboardButton(
-                        f"Episode {episode['episode_number']}: {episode['name']}",
-                        callback_data=EPISODE_PATTERN.format(series_id, season_number, episode['episode_number'])
-                    )
-                ])
-        
-        reply_markup = InlineKeyboardMarkup(keyboard)
-        
+        context.user_data["selected_series_id"] = series_id
+        # Prompt user to enter episode number as a message
         context.bot.send_message(
             chat_id=query.message.chat_id,
-            text=f"Which episode of Season {season_number} are you currently watching?",
-            reply_markup=reply_markup
+            text=f"Enter episode number:"
         )
-        
-        return SELECTING_EPISODE
+        return MANUAL_EPISODE_ENTRY
 
     def manual_season_entry(self, update: Update, context: CallbackContext) -> int:
         """Handle manual season number entry"""
@@ -495,7 +427,7 @@ class ConversationManager:
         
         # Update user's progress
         user = self.db.get_user(query.from_user.id)
-        series = self.db.get_series(series_id)
+        series = self.db.get_series_by_id(series_id)
         
         if user and series:
             logger.info(f"Updating progress for user {user.id}, series {series.name} to S{season_number}E{episode_number}")
@@ -515,197 +447,49 @@ class ConversationManager:
         return ConversationHandler.END
 
     def manual_episode_entry(self, update: Update, context: CallbackContext) -> int:
-        """Handle manual episode number entry"""
+        """Handle manual episode number entry (now always used after season selection)"""
         logger.info("Manual episode entry handler called")
         try:
-            # Handle both callback query and message cases
-            if update.callback_query:
-                query = update.callback_query
-                logger.info(f"Manual episode entry requested with callback data: {query.data}")
-                query.answer()  # Answer the callback query to remove loading state
-                try:
-                    data_parts = query.data.split("_")
-                    if len(data_parts) != 3:
-                        logger.error(f"Invalid manual entry callback format: {query.data}")
-                        context.bot.send_message(
-                            chat_id=query.message.chat_id,
-                            text="Error processing your request. Please try again."
-                        )
-                        return ConversationHandler.END
-                    series_id = int(data_parts[1])
-                    season_number = int(data_parts[2])
-                    logger.info(f"Manual episode entry requested for series ID: {series_id}, season: {season_number}")
-                    context.user_data["selected_series_id"] = series_id
-                    context.user_data["selected_season"] = {
-                        "season_number": season_number,
-                        "episodes": []
-                    }
-                    context.bot.send_message(
-                        chat_id=query.message.chat_id,
-                        text=f"Please enter the episode number for Season {season_number} you are currently watching:"
+            # Only handle message case (no callback)
+            logger.info(f"User data: {context.user_data}")
+            try:
+                episode_number = int(update.message.text.strip())
+                if episode_number <= 0:
+                    update.message.reply_text(
+                        "Please enter a positive episode number or use /cancel to cancel."
                     )
                     return MANUAL_EPISODE_ENTRY
-                except (IndexError, ValueError) as e:
-                    logger.error(f"Error parsing manual episode entry data: {query.data}, error: {e}")
-                    context.bot.send_message(
-                        chat_id=query.message.chat_id,
-                        text="Error processing your request. Please try again."
-                    )
-                    return ConversationHandler.END
-            else:
-                logger.info("Manual episode entry received as message")
-                logger.info(f"User data: {context.user_data}")
-                try:
-                    episode_number = int(update.message.text.strip())
-                    if episode_number <= 0:
-                        update.message.reply_text(
-                            "Please enter a positive episode number or use /cancel to cancel."
-                        )
-                        return MANUAL_EPISODE_ENTRY
-                except ValueError:
-                    update.message.reply_text(
-                        "Please enter a valid number for the episode or use /cancel to cancel."
-                    )
-                    return MANUAL_EPISODE_ENTRY
-                series_id = context.user_data.get("selected_series_id")
-                season_data = context.user_data.get("selected_season", {})
-                season_number = season_data.get("season_number")
-                logger.info(f"Processing manual episode entry - Series ID: {series_id}, Season: {season_number}, Episode: {episode_number}")
-                if not series_id or not season_number:
-                    logger.error(f"Missing series_id or season_number in context: {context.user_data}")
-                    update.message.reply_text("Error: Series or season information not found. Please try again from the beginning.")
-                    return ConversationHandler.END
-                user = self.db.get_user(update.message.from_user.id)
-                series = self.db.get_series(int(series_id))
-                if user and series:
-                    logger.info(f"Updating progress for user {user.id}, series {series.name} to S{season_number}E{episode_number}")
-                    self.db.update_user_series(user.id, series.id, season_number, episode_number)
-                    update.message.reply_text(
-                        f"Great! I've updated your progress to Season {season_number}, Episode {episode_number}."
-                    )
-                else:
-                    logger.error(f"Failed to update progress - user or series not found. User: {user}, Series: {series}")
-                    update.message.reply_text("Error updating your progress. Please try again later.")
+            except ValueError:
+                update.message.reply_text(
+                    "Please enter a valid number for the episode or use /cancel to cancel."
+                )
+                return MANUAL_EPISODE_ENTRY
+            series_id = context.user_data.get("selected_series_id")
+            season_data = context.user_data.get("selected_season", {})
+            season_number = season_data.get("season_number")
+            logger.info(f"Processing manual episode entry - Series ID: {series_id}, Season: {season_number}, Episode: {episode_number}")
+            if not series_id or not season_number:
+                logger.error(f"Missing series_id or season_number in context: {context.user_data}")
+                update.message.reply_text("Error: Series or season information not found. Please try again from the beginning.")
                 return ConversationHandler.END
+            user = self.db.get_user(update.message.from_user.id)
+            series = self.db.get_series_by_id(int(series_id))
+            if user and series:
+                logger.info(f"Updating progress for user {user.id}, series {series.name} to S{season_number}E{episode_number}")
+                self.db.update_user_series(user.id, series.id, season_number, episode_number)
+                update.message.reply_text(
+                    f"Great! I've updated your progress to Season {season_number}, Episode {episode_number}."
+                )
+            else:
+                logger.error(f"Failed to update progress - user or series not found. User: {user}, Series: {series}")
+                update.message.reply_text("Error updating your progress. Please try again later.")
+            return ConversationHandler.END
         except Exception as e:
             logger.error(f"Error in manual episode entry: {e}", exc_info=True)
-            if update.callback_query:
-                update.callback_query.edit_message_text(
-                    "An error occurred. Please try again or use /cancel to cancel."
-                )
-            else:
-                update.message.reply_text(
-                    "An error occurred. Please try again or use /cancel to cancel."
-                )
-            return MANUAL_EPISODE_ENTRY
-        
-    def update_series_start(self, update: Update, context: CallbackContext) -> int:
-        """Start the update series conversation."""
-        logger.info("Starting update series conversation")
-        
-        # Log the update object details
-        if update.callback_query:
-            logger.info(f"Callback query data: {update.callback_query.data}")
-            logger.info(f"From user: {update.callback_query.from_user.id}")
-            chat_id = update.callback_query.message.chat_id
-        else:
-            logger.info(f"Message from user: {update.effective_user.id}")
-            chat_id = update.message.chat_id
-            
-        user = self.db.get_user(update.effective_user.id)
-        if not user:
-            logger.warning(f"User not found in database for telegram_id: {update.effective_user.id}")
-            if update.callback_query:
-                update.callback_query.answer("User not found in database")
-            return ConversationHandler.END
-            
-        series_list = self.db.get_user_series_list(user.id)
-        if not series_list:
-            logger.warning(f"No series found for user {user.id}")
-            if update.callback_query:
-                update.callback_query.answer("You don't have any series to update")
-            return ConversationHandler.END
-            
-        logger.info(f"Retrieved {len(series_list)} series for user {user.id}")
-        keyboard = []
-        for user_series, series in series_list:
-            logger.info(f"Adding series to keyboard: {series.name} (ID: {series.tmdb_id})")
-            keyboard.append([InlineKeyboardButton(
-                f"{series.name} (S{user_series.current_season}E{user_series.current_episode})",
-                callback_data=SERIES_PATTERN.format(series.tmdb_id)
-            )])
-            
-        keyboard.append([InlineKeyboardButton("Cancel", callback_data=CANCEL_PATTERN)])
-        reply_markup = InlineKeyboardMarkup(keyboard)
-        
-        message = "Select a series to update:"
-        try:
-            logger.info("Sending new message with series list")
-            context.bot.send_message(
-                chat_id=chat_id,
-                text=message,
-                reply_markup=reply_markup
+            update.message.reply_text(
+                "An error occurred. Please try again or use /cancel to cancel."
             )
-            logger.info("Successfully sent message with series list")
-        except Exception as e:
-            logger.error(f"Error sending message: {e}", exc_info=True)
-            if update.callback_query:
-                update.callback_query.answer("Error showing series list")
-            return ConversationHandler.END
-            
-        return SELECTING_SERIES
-        
-    def remove_series_start(self, update: Update, context: CallbackContext) -> int:
-        """Start the remove series conversation"""
-        # Get the user from database
-        user_id = update.callback_query.from_user.id if update.callback_query else update.message.from_user.id
-        user = self.db.get_user(user_id)
-        
-        if not user:
-            message = "You need to add a series first. Use /add command."
-            if update.callback_query:
-                update.callback_query.answer()
-                update.callback_query.edit_message_text(message)
-            else:
-                update.message.reply_text(message)
-            return ConversationHandler.END
-            
-        user_series_list = self.db.get_user_series_list(user.id)
-        
-        if not user_series_list:
-            message = "You're not watching any series yet. Use /add command to add one."
-            if update.callback_query:
-                update.callback_query.answer()
-                update.callback_query.edit_message_text(message)
-            else:
-                update.message.reply_text(message)
-            return ConversationHandler.END
-            
-        # Create inline keyboard with the user's series
-        keyboard = []
-        for user_series, series in user_series_list:
-            keyboard.append([
-                InlineKeyboardButton(
-                    f"{series.name}",
-                    callback_data=SERIES_PATTERN.format(series.id)  # Use internal ID for removal
-                )
-            ])
-            
-        # Add a cancel button
-        keyboard.append([InlineKeyboardButton("Cancel", callback_data=CANCEL_PATTERN)])
-        
-        reply_markup = InlineKeyboardMarkup(keyboard)
-        
-        message = "Which series do you want to remove from your watchlist?"
-        if update.callback_query:
-            update.callback_query.answer()
-            update.callback_query.edit_message_text(message, reply_markup=reply_markup)
-        else:
-            update.message.reply_text(message, reply_markup=reply_markup)
-        
-        context.user_data["action"] = "remove"  # Flag to indicate removal action
-        
-        return SELECTING_SERIES
+            return MANUAL_EPISODE_ENTRY
         
     def cancel(self, update: Update, context: CallbackContext) -> int:
         """Cancel the conversation"""
@@ -1147,7 +931,7 @@ class ConversationManager:
                 keyboard.append([
                     InlineKeyboardButton(
                         f"Season {season_num}",
-                        callback_data=SEASON_PATTERN.format(manual_id, season_num)
+                        callback_data=SEASON_PATTERN.format(series.id, season_num)
                     )
                 ])
                 
@@ -1167,3 +951,90 @@ class ConversationManager:
         except ValueError:
             update.message.reply_text("Please enter a valid number for the seasons or use /cancel to cancel.")
             return MANUAL_SERIES_SEASONS 
+
+    def update_progress_start(self, update: Update, context: CallbackContext) -> int:
+        """Start the update progress flow: show user's watching series as inline buttons."""
+        user_id = update.effective_user.id if update.effective_user else update.callback_query.from_user.id
+        user = self.db.get_user(user_id)
+        if not user:
+            if update.callback_query:
+                update.callback_query.answer()
+                update.callback_query.edit_message_text("You need to add a series first. Use /add command.")
+            else:
+                update.message.reply_text("You need to add a series first. Use /add command.")
+            return ConversationHandler.END
+        user_series_list = self.db.get_user_series_list(user.id)
+        if not user_series_list:
+            if update.callback_query:
+                update.callback_query.answer()
+                update.callback_query.edit_message_text("You're not watching any series yet. Use /add command.")
+            else:
+                update.message.reply_text("You're not watching any series yet. Use /add command.")
+            return ConversationHandler.END
+        keyboard = []
+        for user_series, series in user_series_list:
+            year_str = f" ({series.year})" if series.year else ""
+            keyboard.append([
+                InlineKeyboardButton(
+                    f"{series.name}{year_str}",
+                    callback_data=f"update_series_{series.id}"
+                )
+            ])
+        keyboard.append([InlineKeyboardButton("Cancel", callback_data=CANCEL_PATTERN)])
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        if update.callback_query:
+            update.callback_query.edit_message_text(
+                "Select a series to update your progress:",
+                reply_markup=reply_markup
+            )
+        else:
+            update.message.reply_text(
+                "Select a series to update your progress:",
+                reply_markup=reply_markup
+            )
+        return SELECTING_SERIES
+
+    def update_progress_series_selected(self, update: Update, context: CallbackContext) -> int:
+        """Handle series selection for update progress flow, then prompt for season selection."""
+        query = update.callback_query
+        query.answer()
+        try:
+            series_id = int(query.data.split("_")[2])
+            logger.info(f"Update progress: selected series ID: {series_id}")
+        except (IndexError, ValueError) as e:
+            logger.error(f"Error parsing series ID from update progress callback: {query.data}, error: {e}")
+            query.edit_message_text("Error processing your selection. Please try again.")
+            return ConversationHandler.END
+        # Reuse the season selection logic from series_selected
+        series_details = self.tmdb.get_series_details(series_id)
+        keyboard = []
+        if series_details and 'seasons' in series_details and series_details['seasons']:
+            for season in series_details['seasons']:
+                keyboard.append([
+                    InlineKeyboardButton(
+                        f"Season {season['season_number']}",
+                        callback_data=SEASON_PATTERN.format(series_id, season['season_number'])
+                    )
+                ])
+        else:
+            local_series = self.db.get_series_by_id(series_id)
+            if not local_series:
+                query.edit_message_text("Error retrieving series details. Please try again later.")
+                return ConversationHandler.END
+            total_seasons = getattr(local_series, 'total_seasons', 1)
+            for season_num in range(1, total_seasons + 1):
+                keyboard.append([
+                    InlineKeyboardButton(
+                        f"Season {season_num}",
+                        callback_data=SEASON_PATTERN.format(series_id, season_num)
+                    )
+                ])
+        keyboard.append([InlineKeyboardButton("Enter season number manually", callback_data=MANUAL_SEASON_PATTERN.format(series_id))])
+        keyboard.append([InlineKeyboardButton("Cancel", callback_data=CANCEL_PATTERN)])
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        query.edit_message_text(
+            "Which season are you currently watching?",
+            reply_markup=reply_markup
+        )
+        context.user_data["selected_series_id"] = series_id
+        return SELECTING_SEASON 

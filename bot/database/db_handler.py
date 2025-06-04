@@ -244,4 +244,8 @@ class DBHandler:
         
     def close(self):
         """Close the database session"""
-        self.session.close() 
+        self.session.close()
+
+    def get_series_by_id(self, series_id):
+        """Get a series by its internal database ID (primary key)"""
+        return self.session.query(Series).filter(Series.id == series_id).first() 
