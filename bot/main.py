@@ -124,30 +124,38 @@ class SeriesTrackerBot:
                 SELECTING_SERIES: [
                     MessageHandler(Filters.text & ~Filters.command, self.conversation_manager.search_series),
                     CallbackQueryHandler(self.conversation_manager.series_selected, pattern=f"^{SERIES_PATTERN.format('.*')}$"),
-                    CallbackQueryHandler(self.conversation_manager.manual_series_name_prompt, pattern=f"^{MANUAL_ADD_PATTERN}$")
+                    CallbackQueryHandler(self.conversation_manager.manual_series_name_prompt, pattern=f"^{MANUAL_ADD_PATTERN}$"),
+                    CallbackQueryHandler(self.conversation_manager.cancel, pattern=f"^{CANCEL_PATTERN}$")
                 ],
                 MANUAL_SERIES_NAME: [
-                    MessageHandler(Filters.text & ~Filters.command, self.conversation_manager.manual_series_name_entered)
+                    MessageHandler(Filters.text & ~Filters.command, self.conversation_manager.manual_series_name_entered),
+                    CommandHandler("cancel", self.conversation_manager.cancel)
                 ],
                 MANUAL_SERIES_YEAR: [
-                    MessageHandler(Filters.text & ~Filters.command, self.conversation_manager.manual_series_year_entered)
+                    MessageHandler(Filters.text & ~Filters.command, self.conversation_manager.manual_series_year_entered),
+                    CommandHandler("cancel", self.conversation_manager.cancel)
                 ],
                 MANUAL_SERIES_SEASONS: [
-                    MessageHandler(Filters.text & ~Filters.command, self.conversation_manager.manual_series_seasons_entered)
+                    MessageHandler(Filters.text & ~Filters.command, self.conversation_manager.manual_series_seasons_entered),
+                    CommandHandler("cancel", self.conversation_manager.cancel)
                 ],
                 SELECTING_SEASON: [
                     CallbackQueryHandler(self.conversation_manager.season_selected, pattern=f"^{SEASON_PATTERN.format('.*', '.*')}$"),
-                    CallbackQueryHandler(self.conversation_manager.manual_season_entry, pattern=f"^{MANUAL_SEASON_PATTERN.format('.*')}$")
+                    CallbackQueryHandler(self.conversation_manager.manual_season_entry, pattern=f"^{MANUAL_SEASON_PATTERN.format('.*')}$"),
+                    CallbackQueryHandler(self.conversation_manager.cancel, pattern=f"^{CANCEL_PATTERN}$")
                 ],
                 MANUAL_SEASON_ENTRY: [
-                    MessageHandler(Filters.text & ~Filters.command, self.conversation_manager.manual_season_entry)
+                    MessageHandler(Filters.text & ~Filters.command, self.conversation_manager.manual_season_entry),
+                    CommandHandler("cancel", self.conversation_manager.cancel)
                 ],
                 SELECTING_EPISODE: [
                     CallbackQueryHandler(self.conversation_manager.episode_selected, pattern=f"^{EPISODE_PATTERN.format('.*', '.*', '.*')}$"),
-                    CallbackQueryHandler(self.conversation_manager.manual_episode_entry, pattern=f"^{MANUAL_ENTRY_PATTERN.format('.*', '.*')}$")
+                    CallbackQueryHandler(self.conversation_manager.manual_episode_entry, pattern=f"^{MANUAL_ENTRY_PATTERN.format('.*', '.*')}$"),
+                    CallbackQueryHandler(self.conversation_manager.cancel, pattern=f"^{CANCEL_PATTERN}$")
                 ],
                 MANUAL_EPISODE_ENTRY: [
-                    MessageHandler(Filters.text & ~Filters.command, self.conversation_manager.manual_episode_entry)
+                    MessageHandler(Filters.text & ~Filters.command, self.conversation_manager.manual_episode_entry),
+                    CommandHandler("cancel", self.conversation_manager.cancel)
                 ]
             },
             fallbacks=[CommandHandler("cancel", self.conversation_manager.cancel)]
@@ -163,21 +171,26 @@ class SeriesTrackerBot:
             ],
             states={
                 SELECTING_SERIES: [
-                    CallbackQueryHandler(self.conversation_manager.update_progress_series_selected, pattern="^update_series_.*$")
+                    CallbackQueryHandler(self.conversation_manager.update_progress_series_selected, pattern="^update_series_.*$"),
+                    CallbackQueryHandler(self.conversation_manager.cancel, pattern=f"^{CANCEL_PATTERN}$")
                 ],
                 SELECTING_SEASON: [
                     CallbackQueryHandler(self.conversation_manager.season_selected, pattern=f"^{SEASON_PATTERN.format('.*', '.*')}$"),
-                    CallbackQueryHandler(self.conversation_manager.manual_season_entry, pattern=f"^{MANUAL_SEASON_PATTERN.format('.*')}$")
+                    CallbackQueryHandler(self.conversation_manager.manual_season_entry, pattern=f"^{MANUAL_SEASON_PATTERN.format('.*')}$"),
+                    CallbackQueryHandler(self.conversation_manager.cancel, pattern=f"^{CANCEL_PATTERN}$")
                 ],
                 MANUAL_SEASON_ENTRY: [
-                    MessageHandler(Filters.text & ~Filters.command, self.conversation_manager.manual_season_entry)
+                    MessageHandler(Filters.text & ~Filters.command, self.conversation_manager.manual_season_entry),
+                    CommandHandler("cancel", self.conversation_manager.cancel)
                 ],
                 SELECTING_EPISODE: [
                     CallbackQueryHandler(self.conversation_manager.episode_selected, pattern=f"^{EPISODE_PATTERN.format('.*', '.*', '.*')}$"),
-                    CallbackQueryHandler(self.conversation_manager.manual_episode_entry, pattern=f"^{MANUAL_ENTRY_PATTERN.format('.*', '.*')}$")
+                    CallbackQueryHandler(self.conversation_manager.manual_episode_entry, pattern=f"^{MANUAL_ENTRY_PATTERN.format('.*', '.*')}$"),
+                    CallbackQueryHandler(self.conversation_manager.cancel, pattern=f"^{CANCEL_PATTERN}$")
                 ],
                 MANUAL_EPISODE_ENTRY: [
-                    MessageHandler(Filters.text & ~Filters.command, self.conversation_manager.manual_episode_entry)
+                    MessageHandler(Filters.text & ~Filters.command, self.conversation_manager.manual_episode_entry),
+                    CommandHandler("cancel", self.conversation_manager.cancel)
                 ]
             },
             fallbacks=[CommandHandler("cancel", self.conversation_manager.cancel)]
@@ -217,22 +230,25 @@ class SeriesTrackerBot:
                 InlineKeyboardButton("Add series in watchlist", callback_data="command_add"),
                 InlineKeyboardButton("Series in progress", callback_data="command_list")
             ],
-            # [
-            #     InlineKeyboardButton("Watch later", callback_data="command_watchlist")
-            # ],
             [
                 InlineKeyboardButton("Help", callback_data="command_help")
             ]
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
         
-        update.message.reply_text(
+        welcome_text = (
             f"Hello {user.first_name}! 👋\n\n"
             f"I'm your personal TV Series Tracker. I'll help you keep track of which TV shows you're watching. "
             f"In future we will add possibility to save series you plan to watch and check the list of already watched series.\n\n"
-            f"You can access all commands by clicking the menu button in our chat or by using the buttons below:",
-            reply_markup=reply_markup
+            f"You can access all commands by clicking the menu button in our chat or by using the buttons below:"
         )
+        
+        # Determine if this is from a callback or direct command
+        if update.callback_query:
+            update.callback_query.answer()
+            update.callback_query.edit_message_text(welcome_text, reply_markup=reply_markup)
+        else:
+            update.message.reply_text(welcome_text, reply_markup=reply_markup)
         
     def help_command(self, update: Update, context: CallbackContext) -> None:
         """Send a message when the command /help is issued."""
@@ -241,12 +257,6 @@ class SeriesTrackerBot:
             [
                 InlineKeyboardButton("Add series in watchlist", callback_data="command_add"),
                 InlineKeyboardButton("Series in progress", callback_data="command_list")
-            ],
-            # [
-            #     InlineKeyboardButton("Watch later", callback_data="command_watchlist")
-            # ],
-            [
-                InlineKeyboardButton("Help", callback_data="command_help")
             ]
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
@@ -256,10 +266,6 @@ class SeriesTrackerBot:
             "*Tracking Series You're Watching*\n"
             "/addinwatchlist - Add a new TV series to track your watching progress\n"
             "/watchlist - List all TV series you're currently watching\n"
-            # "/watchlist - View series in your future watchlist\n"
-            # "/addwatch - Add a series to your future watchlist\n\n"
-            # "/watched - List all watched series\n"
-            # "/addwatched - Add a new watched series\n\n"
             "/help - Show this help message\n\n"
             "You can also access these commands anytime by clicking the menu button (☰) in our chat."
         )
@@ -281,7 +287,7 @@ class SeriesTrackerBot:
             # Create keyboard with options
             keyboard = [
                 [InlineKeyboardButton("Add Series", callback_data="command_add")],
-                [InlineKeyboardButton("Watch later", callback_data="command_watchlist")],
+                # [InlineKeyboardButton("Watch later", callback_data="command_watchlist")],
                 [InlineKeyboardButton("Help", callback_data="command_help")]
             ]
             reply_markup = InlineKeyboardMarkup(keyboard)
@@ -299,7 +305,7 @@ class SeriesTrackerBot:
             # Create keyboard with options
             keyboard = [
                 [InlineKeyboardButton("Add Series", callback_data="command_add")],
-                [InlineKeyboardButton("Watch later", callback_data="command_watchlist")],
+                # [InlineKeyboardButton("Watch later", callback_data="command_watchlist")],
                 [InlineKeyboardButton("Help", callback_data="command_help")]
             ]
             reply_markup = InlineKeyboardMarkup(keyboard)
@@ -346,7 +352,7 @@ class SeriesTrackerBot:
                     InlineKeyboardButton("📝 Update Progress", callback_data="command_update")
                 ],
                 [
-                    InlineKeyboardButton("📺 Watch later", callback_data="command_watchlist"),
+                    # InlineKeyboardButton("📺 Watch later", callback_data="command_watchlist"),
                     InlineKeyboardButton("❓ Help", callback_data="command_help")
                 ]
             ]
@@ -445,7 +451,7 @@ class SeriesTrackerBot:
         elif command == 'list':
             logger.info("Showing series list...")
             query.answer("Showing series list...")
-            return self.list_series(update, context)
+            return self.list_series_callback(update, context)
         elif command == 'watchlist':
             logger.info("Showing watchlist...")
             query.answer("Showing watchlist...")
@@ -480,7 +486,7 @@ class SeriesTrackerBot:
                 # Create keyboard with options
                 keyboard = [
                     [InlineKeyboardButton("Add Series", callback_data="command_add")],
-                    [InlineKeyboardButton("Watch later", callback_data="command_watchlist")],
+                    # [InlineKeyboardButton("Watch later", callback_data="command_watchlist")],
                     [InlineKeyboardButton("Help", callback_data="command_help")]
                 ]
                 reply_markup = InlineKeyboardMarkup(keyboard)
@@ -498,7 +504,7 @@ class SeriesTrackerBot:
                 # Create keyboard with options
                 keyboard = [
                     [InlineKeyboardButton("Add Series", callback_data="command_add")],
-                    [InlineKeyboardButton("Watch later", callback_data="command_watchlist")],
+                    # [InlineKeyboardButton("Watch later", callback_data="command_watchlist")],
                     [InlineKeyboardButton("Help", callback_data="command_help")]
                 ]
                 reply_markup = InlineKeyboardMarkup(keyboard)
@@ -545,7 +551,7 @@ class SeriesTrackerBot:
                         InlineKeyboardButton("📝 Update Progress", callback_data="command_update")
                     ],
                     [
-                        InlineKeyboardButton("📺 Watch later", callback_data="command_watchlist"),
+                        # InlineKeyboardButton("📺 Watch later", callback_data="command_watchlist"),
                         InlineKeyboardButton("❓ Help", callback_data="command_help")
                     ]
                 ]

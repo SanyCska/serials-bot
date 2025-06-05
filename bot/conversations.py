@@ -338,19 +338,9 @@ class ConversationManager:
                     "episodes": []  # Empty list since we don't have episode data
                 }
                 
-                # Create keyboard with manual episode entry option
-                keyboard = [
-                    [InlineKeyboardButton(
-                        "Enter episode number manually",
-                        callback_data=MANUAL_ENTRY_PATTERN.format(series_id, season_number)
-                    )],
-                    [InlineKeyboardButton("Cancel", callback_data=CANCEL_PATTERN)]
-                ]
-                reply_markup = InlineKeyboardMarkup(keyboard)
-                
+                # Directly prompt for episode number
                 update.message.reply_text(
-                    f"Please enter the episode number for Season {season_number} you are currently watching:",
-                    reply_markup=reply_markup
+                    f"Please enter the episode number for Season {season_number} you are currently watching:"
                 )
                 
                 return MANUAL_EPISODE_ENTRY
