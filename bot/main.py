@@ -89,10 +89,10 @@ class SeriesTrackerBot:
     def _set_commands(self):
         """Set the commands menu for the bot"""
         bot_commands = [
-            ('start', 'Start the bot'),
-            ('help', 'Show help message'),
-            ('addinwatchlist', "Add a new series you're watching"),
-            ('watchlist', 'Series in progress'),
+            ('start', 'Запустить бота'),
+            ('help', 'Показать справку'),
+            ('addinwatchlist', "Добавить новый сериал для отслеживания"),
+            ('watchlist', 'Сериалы в процессе просмотра'),
             # ('watchlater', 'Add series you plan to watch'),
             # ('addinwatchlater', 'Add a series you plan to watch'),
             # ('watched', 'List all watched series'),
@@ -227,20 +227,20 @@ class SeriesTrackerBot:
         # Create inline keyboard with primary commands
         keyboard = [
             [
-                InlineKeyboardButton("Add series in watchlist", callback_data="command_add"),
-                InlineKeyboardButton("Series in progress", callback_data="command_list")
+                InlineKeyboardButton("Добавить сериал в список", callback_data="command_add"),
+                InlineKeyboardButton("Сериалы в процессе", callback_data="command_list")
             ],
             [
-                InlineKeyboardButton("Help", callback_data="command_help")
+                InlineKeyboardButton("Помощь", callback_data="command_help")
             ]
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
         
         welcome_text = (
-            f"Hello {user.first_name}! 👋\n\n"
-            f"I'm your personal TV Series Tracker. I'll help you keep track of which TV shows you're watching. "
-            f"In future we will add possibility to save series you plan to watch and check the list of already watched series.\n\n"
-            f"You can access all commands by clicking the menu button in our chat or by using the buttons below:"
+            f"Привет, {user.first_name}! 👋\n\n"
+            f"Я ваш персональный трекер сериалов. Я помогу вам отслеживать, какие сериалы вы смотрите. "
+            f"В будущем мы добавим возможность сохранять сериалы, которые вы планируете посмотреть, и проверять список уже просмотренных сериалов.\n\n"
+            f"Вы можете получить доступ ко всем командам, нажав кнопку меню в нашем чате или используя кнопки ниже:"
         )
         
         # Determine if this is from a callback or direct command
@@ -255,19 +255,19 @@ class SeriesTrackerBot:
         # Create inline keyboard with primary commands
         keyboard = [
             [
-                InlineKeyboardButton("Add series in watchlist", callback_data="command_add"),
-                InlineKeyboardButton("Series in progress", callback_data="command_list")
+                InlineKeyboardButton("Добавить сериал в список", callback_data="command_add"),
+                InlineKeyboardButton("Сериалы в процессе", callback_data="command_list")
             ]
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
         
         help_text = (
-            "Here are the commands you can use:\n\n"
-            "*Tracking Series You're Watching*\n"
-            "/addinwatchlist - Add a new TV series to track your watching progress\n"
-            "/watchlist - List all TV series you're currently watching\n"
-            "/help - Show this help message\n\n"
-            "You can also access these commands anytime by clicking the menu button (☰) in our chat."
+            "Вот команды, которые вы можете использовать:\n\n"
+            "*Отслеживание сериалов, которые вы смотрите*\n"
+            "/addinwatchlist - Добавить новый сериал для отслеживания прогресса\n"
+            "/watchlist - Показать все сериалы, которые вы сейчас смотрите\n"
+            "/help - Показать это сообщение справки\n\n"
+            "Вы также можете получить доступ к этим командам в любое время, нажав кнопку меню (☰) в нашем чате."
         )
         
         # Determine if this is from a callback or direct command
@@ -286,13 +286,13 @@ class SeriesTrackerBot:
             logger.warning(f"User not found in database for telegram_id: {update.effective_user.id}")
             # Create keyboard with options
             keyboard = [
-                [InlineKeyboardButton("Add Series", callback_data="command_add")],
+                [InlineKeyboardButton("Добавить сериал", callback_data="command_add")],
                 # [InlineKeyboardButton("Watch later", callback_data="command_watchlist")],
-                [InlineKeyboardButton("Help", callback_data="command_help")]
+                [InlineKeyboardButton("Помощь", callback_data="command_help")]
             ]
             reply_markup = InlineKeyboardMarkup(keyboard)
             update.message.reply_text(
-                "You need to add a series first. Use /add command or the button below.",
+                "Сначала вам нужно добавить сериал. Используйте команду /add или кнопку ниже.",
                 reply_markup=reply_markup
             )
             return
@@ -304,20 +304,20 @@ class SeriesTrackerBot:
             logger.info(f"No series found for user {user.id}")
             # Create keyboard with options
             keyboard = [
-                [InlineKeyboardButton("Add Series", callback_data="command_add")],
+                [InlineKeyboardButton("Добавить сериал", callback_data="command_add")],
                 # [InlineKeyboardButton("Watch later", callback_data="command_watchlist")],
-                [InlineKeyboardButton("Help", callback_data="command_help")]
+                [InlineKeyboardButton("Помощь", callback_data="command_help")]
             ]
             reply_markup = InlineKeyboardMarkup(keyboard)
             update.message.reply_text(
-                "You're not watching any series yet. Use /addinwatchlist command or the button below.",
+                "Вы еще не смотрите никаких сериалов. Используйте команду /addinwatchlist или кнопку ниже.",
                 reply_markup=reply_markup
             )
             return
             
         # Send header message
         try:
-            update.message.reply_text("*Your TV Series Watchlist:*", parse_mode=ParseMode.MARKDOWN)
+            update.message.reply_text("*Ваш список просматриваемых сериалов:*", parse_mode=ParseMode.MARKDOWN)
             logger.info("Sent header message")
         except Exception as e:
             logger.error(f"Error sending header message: {e}")
@@ -328,13 +328,13 @@ class SeriesTrackerBot:
             try:
                 year_str = f" ({series.year})" if series.year else ""
                 message = f"• *{series.name}*{year_str}\n"
-                message += f"  Currently at: Season {user_series.current_season}, Episode {user_series.current_episode}"
+                message += f"  Сейчас: сезон {user_series.current_season}, серия {user_series.current_episode}"
                 
                 # Show the 'Watched' and 'Remove' buttons for each series
                 keyboard = [
                     [
-                        InlineKeyboardButton(f"✅ Watched", callback_data=f"mark_watched_{series.id}"),
-                        InlineKeyboardButton(f"❌ Remove", callback_data=f"remove_series_{series.id}")
+                        InlineKeyboardButton(f"✅ Просмотрено", callback_data=f"mark_watched_{series.id}"),
+                        InlineKeyboardButton(f"❌ Удалить", callback_data=f"remove_series_{series.id}")
                     ]
                 ]
                 reply_markup = InlineKeyboardMarkup(keyboard)
@@ -348,16 +348,16 @@ class SeriesTrackerBot:
         try:
             keyboard = [
                 [
-                    InlineKeyboardButton("➕ Add Series", callback_data="command_add"),
-                    InlineKeyboardButton("📝 Update Progress", callback_data="command_update")
+                    InlineKeyboardButton("➕ Добавить сериал", callback_data="command_add"),
+                    InlineKeyboardButton("📝 Обновить прогресс", callback_data="command_update")
                 ],
                 [
                     # InlineKeyboardButton("📺 Watch later", callback_data="command_watchlist"),
-                    InlineKeyboardButton("❓ Help", callback_data="command_help")
+                    InlineKeyboardButton("❓ Помощь", callback_data="command_help")
                 ]
             ]
             reply_markup = InlineKeyboardMarkup(keyboard)
-            update.message.reply_text("*Actions:*", parse_mode=ParseMode.MARKDOWN, reply_markup=reply_markup)
+            update.message.reply_text("*Действия:*", parse_mode=ParseMode.MARKDOWN, reply_markup=reply_markup)
             logger.info("Sent footer message with actions")
         except Exception as e:
             logger.error(f"Error sending footer message: {e}")
@@ -370,7 +370,7 @@ class SeriesTrackerBot:
         if update and update.effective_chat:
             context.bot.send_message(
                 chat_id=update.effective_chat.id,
-                text="Sorry, an error occurred. Please try again or contact the developer if the problem persists."
+                text="Извините, произошла ошибка. Пожалуйста, попробуйте снова или свяжитесь с разработчиком, если проблема сохраняется."
             )
         
     def start_bot(self, use_webhook=True):
@@ -485,13 +485,13 @@ class SeriesTrackerBot:
                 logger.warning(f"User not found for telegram_id: {query.from_user.id}")
                 # Create keyboard with options
                 keyboard = [
-                    [InlineKeyboardButton("Add Series", callback_data="command_add")],
+                    [InlineKeyboardButton("Добавить сериал", callback_data="command_add")],
                     # [InlineKeyboardButton("Watch later", callback_data="command_watchlist")],
-                    [InlineKeyboardButton("Help", callback_data="command_help")]
+                    [InlineKeyboardButton("Помощь", callback_data="command_help")]
                 ]
                 reply_markup = InlineKeyboardMarkup(keyboard)
                 query.edit_message_text(
-                    "You need to add a series first. Use the Add Series button or /add command.",
+                    "Сначала вам нужно добавить сериал. Используйте команду /add или кнопку ниже.",
                     reply_markup=reply_markup
                 )
                 return
@@ -503,19 +503,19 @@ class SeriesTrackerBot:
                 logger.info(f"No series found for user {user.id}")
                 # Create keyboard with options
                 keyboard = [
-                    [InlineKeyboardButton("Add Series", callback_data="command_add")],
+                    [InlineKeyboardButton("Добавить сериал", callback_data="command_add")],
                     # [InlineKeyboardButton("Watch later", callback_data="command_watchlist")],
-                    [InlineKeyboardButton("Help", callback_data="command_help")]
+                    [InlineKeyboardButton("Помощь", callback_data="command_help")]
                 ]
                 reply_markup = InlineKeyboardMarkup(keyboard)
                 query.edit_message_text(
-                    "You're not watching any series yet. Use /addinwatchlist command or the button below.",
+                    "Вы еще не смотрите никаких сериалов. Используйте команду /addinwatchlist или кнопку ниже.",
                     reply_markup=reply_markup
                 )
                 return
                 
             # Edit current message to show header
-            query.edit_message_text("*Your TV Series Watchlist:*", parse_mode=ParseMode.MARKDOWN)
+            query.edit_message_text("*Ваш список просматриваемых сериалов:*", parse_mode=ParseMode.MARKDOWN)
             logger.info("Updated header message")
             
             # Send each series as a separate message
@@ -523,12 +523,12 @@ class SeriesTrackerBot:
                 try:
                     year_str = f" ({series.year})" if series.year else ""
                     message = f"• *{series.name}*{year_str}\n"
-                    message += f"  Currently at: Season {user_series.current_season}, Episode {user_series.current_episode}"
+                    message += f"  Сейчас: сезон {user_series.current_season}, серия {user_series.current_episode}"
                     
                     # Only show the 'Watched' button for each series
                     keyboard = [
                         [
-                            InlineKeyboardButton(f"✅ Watched", callback_data=f"mark_watched_{series.id}")
+                            InlineKeyboardButton(f"✅ Просмотрено", callback_data=f"mark_watched_{series.id}")
                         ]
                     ]
                     reply_markup = InlineKeyboardMarkup(keyboard)
@@ -547,18 +547,18 @@ class SeriesTrackerBot:
             try:
                 keyboard = [
                     [
-                        InlineKeyboardButton("➕ Add Series", callback_data="command_add"),
-                        InlineKeyboardButton("📝 Update Progress", callback_data="command_update")
+                        InlineKeyboardButton("➕ Добавить сериал", callback_data="command_add"),
+                        InlineKeyboardButton("📝 Обновить прогресс", callback_data="command_update")
                     ],
                     [
                         # InlineKeyboardButton("📺 Watch later", callback_data="command_watchlist"),
-                        InlineKeyboardButton("❓ Help", callback_data="command_help")
+                        InlineKeyboardButton("❓ Помощь", callback_data="command_help")
                     ]
                 ]
                 reply_markup = InlineKeyboardMarkup(keyboard)
                 context.bot.send_message(
                     chat_id=query.message.chat_id,
-                    text="*Actions:*",
+                    text="*Действия:*",
                     parse_mode=ParseMode.MARKDOWN,
                     reply_markup=reply_markup
                 )

@@ -46,14 +46,14 @@ class ConversationManager:
                 update.callback_query.answer()  # Answer the callback query to remove loading state
                 context.bot.send_message(
                     chat_id=chat_id,
-                    text="Please send me the name of the TV series you want to add."
+                    text="Пожалуйста, отправьте мне название сериала, который вы хотите добавить."
                 )
             else:
                 logger.info("Add series started from command")
                 chat_id = update.message.chat_id
                 context.bot.send_message(
                     chat_id=chat_id,
-                    text="Please send me the name of the TV series you want to add."
+                    text="Пожалуйста, отправьте мне название сериала, который вы хотите добавить."
                 )
             
             logger.info("Successfully sent initial message for add series")
@@ -104,23 +104,23 @@ class ConversationManager:
                 ])
         
         # Add a manual add option
-        keyboard.append([InlineKeyboardButton("Add manually (not in list)", callback_data=MANUAL_ADD_PATTERN)])
+        keyboard.append([InlineKeyboardButton("Добавить вручную (нет в списке)", callback_data=MANUAL_ADD_PATTERN)])
             
         # Add a cancel button
-        keyboard.append([InlineKeyboardButton("Cancel", callback_data=CANCEL_PATTERN)])
+        keyboard.append([InlineKeyboardButton("Отмена", callback_data=CANCEL_PATTERN)])
         
         reply_markup = InlineKeyboardMarkup(keyboard)
         
         if not results:
             context.bot.send_message(
                 chat_id=chat_id,
-                text="No TV series found with that name. Would you like to add it manually?",
+                text="Сериал с таким названием не найден. Хотите добавить его вручную?",
                 reply_markup=reply_markup
             )
         else:
             context.bot.send_message(
                 chat_id=chat_id,
-                text="Here are the TV series I found. Please select one or add manually:",
+                text="Вот сериалы, которые я нашел. Пожалуйста, выберите один или добавьте вручную:",
                 reply_markup=reply_markup
             )
         
@@ -134,14 +134,14 @@ class ConversationManager:
         
         if query.data == CANCEL_PATTERN:
             logger.info("Series selection cancelled")
-            query.edit_message_text("Operation cancelled.")
+            query.edit_message_text("Операция отменена.")
             return ConversationHandler.END
             
         # Check if this is a manual add request
         if query.data == MANUAL_ADD_PATTERN:
             logger.info("Manual add request received")
             query.edit_message_text(
-                "Please enter the exact name of the TV series you want to add:"
+                "Пожалуйста, введите точное название сериала, который вы хотите добавить:"
             )
             return MANUAL_SERIES_NAME
             
@@ -186,7 +186,7 @@ class ConversationManager:
             for season in series_details['seasons']:
                 keyboard.append([
                     InlineKeyboardButton(
-                        f"Season {season['season_number']}",
+                        f"Сезон {season['season_number']}",
                         callback_data=SEASON_PATTERN.format(series_id, season['season_number'])
                     )
                 ])
@@ -206,17 +206,17 @@ class ConversationManager:
             for season_num in range(1, total_seasons + 1):
                 keyboard.append([
                     InlineKeyboardButton(
-                        f"Season {season_num}",
+                        f"Сезон {season_num}",
                         callback_data=SEASON_PATTERN.format(series_id, season_num)
                     )
                 ])
         # Add a manual season entry option
-        keyboard.append([InlineKeyboardButton("Enter season number manually", callback_data=MANUAL_SEASON_PATTERN.format(series_id))])
+        keyboard.append([InlineKeyboardButton("Ввести номер сезона вручную", callback_data=MANUAL_SEASON_PATTERN.format(series_id))])
         # Add a cancel button
-        keyboard.append([InlineKeyboardButton("Cancel", callback_data=CANCEL_PATTERN)])
+        keyboard.append([InlineKeyboardButton("Отмена", callback_data=CANCEL_PATTERN)])
         reply_markup = InlineKeyboardMarkup(keyboard)
         query.edit_message_text(
-            "Which season are you currently watching?",
+            "Какой сезон вы сейчас смотрите?",
             reply_markup=reply_markup
         )
         # Save selected series_id for later steps
@@ -279,7 +279,7 @@ class ConversationManager:
         # Prompt user to enter episode number as a message
         context.bot.send_message(
             chat_id=query.message.chat_id,
-            text=f"Enter episode number:"
+            text=f"Введите номер серии:"
         )
         return MANUAL_EPISODE_ENTRY
 
@@ -340,7 +340,7 @@ class ConversationManager:
                 
                 # Directly prompt for episode number
                 update.message.reply_text(
-                    f"Please enter the episode number for Season {season_number} you are currently watching:"
+                    f"Пожалуйста, введите номер серии для сезона {season_number}, который вы сейчас смотрите:"
                 )
                 
                 return MANUAL_EPISODE_ENTRY
@@ -392,7 +392,7 @@ class ConversationManager:
                 
                 context.bot.send_message(
                     chat_id=query.message.chat_id,
-                    text=f"Please enter the episode number for Season {season_number} you are currently watching:"
+                    text=f"Пожалуйста, введите номер серии для сезона {season_number}, который вы сейчас смотрите:"
                 )
                 
                 return MANUAL_EPISODE_ENTRY
@@ -429,13 +429,13 @@ class ConversationManager:
             
             context.bot.send_message(
                 chat_id=query.message.chat_id,
-                text=f"Great! I've updated your progress to Season {season_number}, Episode {episode_number}."
+                text=f"Отлично! Я обновил ваш прогресс до Сезона {season_number}, Серии {episode_number}."
             )
         else:
             logger.error(f"Failed to update progress - user or series not found. User: {user}, Series: {series}")
             context.bot.send_message(
                 chat_id=query.message.chat_id,
-                text="Error updating your progress. Please try again later."
+                text="Ошибка обновления прогресса. Пожалуйста, попробуйте позже."
             )
             
         return ConversationHandler.END
@@ -450,12 +450,12 @@ class ConversationManager:
                 episode_number = int(update.message.text.strip())
                 if episode_number <= 0:
                     update.message.reply_text(
-                        "Please enter a positive episode number or use /cancel to cancel."
+                        "Пожалуйста, введите положительный номер серии или используйте /cancel для отмены."
                     )
                     return MANUAL_EPISODE_ENTRY
             except ValueError:
                 update.message.reply_text(
-                    "Please enter a valid number for the episode or use /cancel to cancel."
+                    "Пожалуйста, введите корректный номер серии или используйте /cancel для отмены."
                 )
                 return MANUAL_EPISODE_ENTRY
             series_id = context.user_data.get("selected_series_id")
@@ -472,27 +472,27 @@ class ConversationManager:
                 logger.info(f"Updating progress for user {user.id}, series {series.name} to S{season_number}E{episode_number}")
                 self.db.update_user_series(user.id, series.id, season_number, episode_number)
                 update.message.reply_text(
-                    f"Great! I've updated your progress to Season {season_number}, Episode {episode_number}."
+                    f"Отлично! Я обновил ваш прогресс до Сезона {season_number}, Серии {episode_number}."
                 )
             else:
                 logger.error(f"Failed to update progress - user or series not found. User: {user}, Series: {series}")
-                update.message.reply_text("Error updating your progress. Please try again later.")
+                update.message.reply_text("Ошибка обновления прогресса. Пожалуйста, попробуйте позже.")
             return ConversationHandler.END
         except Exception as e:
             logger.error(f"Error in manual episode entry: {e}", exc_info=True)
             update.message.reply_text(
-                "An error occurred. Please try again or use /cancel to cancel."
+                "Произошла ошибка. Пожалуйста, попробуйте снова или используйте /cancel для отмены."
             )
             return MANUAL_EPISODE_ENTRY
         
     def cancel(self, update: Update, context: CallbackContext) -> int:
         """Cancel the conversation"""
         if update.message:
-            update.message.reply_text("Operation cancelled.")
+            update.message.reply_text("Операция отменена.")
         elif update.callback_query:
             query = update.callback_query
             query.answer()
-            query.edit_message_text("Operation cancelled.")
+            query.edit_message_text("Операция отменена.")
             
         # Clear user data
         context.user_data.clear()
@@ -504,11 +504,11 @@ class ConversationManager:
         # Handle callback query case
         if update.callback_query:
             update.callback_query.edit_message_text(
-                "Please send me the name of the series you want to add to your watch later list."
+                "Пожалуйста, отправьте мне название сериала, который вы хотите добавить в список 'Посмотреть позже'."
             )
         else:
             update.message.reply_text(
-                "Please send me the name of the series you want to add to your watch later list."
+                "Пожалуйста, отправьте мне название сериала, который вы хотите добавить в список 'Посмотреть позже'."
             )
         
         # Set flag to indicate watchlist operation
@@ -522,7 +522,7 @@ class ConversationManager:
         user = self.db.get_user(update.effective_user.id if update.effective_user else update.callback_query.from_user.id)
         
         if not user:
-            message = "You need to add a series first. Use /add or /addwatch command."
+            message = "Сначала вам нужно добавить сериал. Используйте команду /add или /addwatch."
             if update.callback_query:
                 update.callback_query.answer()
                 update.callback_query.edit_message_text(message)
@@ -536,13 +536,13 @@ class ConversationManager:
         if not user_series_list:
             # Create keyboard with options
             keyboard = [
-                [InlineKeyboardButton("Add in Watch later list", callback_data="command_addwatch")],
-                [InlineKeyboardButton("View Watching List", callback_data="command_list")],
-                [InlineKeyboardButton("Help", callback_data="command_help")]
+                [InlineKeyboardButton("Добавить в список 'Посмотреть позже'", callback_data="command_addwatch")],
+                [InlineKeyboardButton("Просмотр списка просмотра", callback_data="command_list")],
+                [InlineKeyboardButton("Помощь", callback_data="command_help")]
             ]
             reply_markup = InlineKeyboardMarkup(keyboard)
             
-            message = "Your Watch Later list is empty. Use /addinwatchlater to add series you plan to watch."
+            message = "Ваш список 'Посмотреть позже' пуст. Используйте /addinwatchlater для добавления сериалов, которые планируете посмотреть."
             if update.callback_query:
                 update.callback_query.answer()
                 update.callback_query.edit_message_text(message, reply_markup=reply_markup)
@@ -553,10 +553,10 @@ class ConversationManager:
         # Send header message
         if update.callback_query:
             update.callback_query.answer()
-            update.callback_query.edit_message_text("*Your Future Watchlist:*", parse_mode=ParseMode.MARKDOWN)
+            update.callback_query.edit_message_text("*Ваш список 'Посмотреть позже':*", parse_mode=ParseMode.MARKDOWN)
             chat_id = update.callback_query.message.chat_id
         else:
-            update.message.reply_text("*Your Future Watchlist:*", parse_mode=ParseMode.MARKDOWN)
+            update.message.reply_text("*Ваш список 'Посмотреть позже':*", parse_mode=ParseMode.MARKDOWN)
             chat_id = update.message.chat_id
             
         # Send each series as a separate message
@@ -567,8 +567,8 @@ class ConversationManager:
             # Create buttons specific to this series
             keyboard = [
                 [
-                    InlineKeyboardButton(f"▶️ Start Watching", callback_data=f"move_watching_{series.id}"),
-                    InlineKeyboardButton(f"❌ Remove", callback_data=f"watchlist_series_{series.id}")
+                    InlineKeyboardButton(f"▶️ Начать просмотр", callback_data=f"move_watching_{series.id}"),
+                    InlineKeyboardButton(f"❌ Удалить", callback_data=f"watchlist_series_{series.id}")
                 ]
             ]
             reply_markup = InlineKeyboardMarkup(keyboard)
@@ -590,11 +590,11 @@ class ConversationManager:
         # Send footer with common actions
         keyboard = [
             [
-                InlineKeyboardButton("➕ Add to Watchlist", callback_data="command_addwatch"),
-                InlineKeyboardButton("📺 View Watching", callback_data="command_list")
+                InlineKeyboardButton("➕ Добавить в список", callback_data="command_addwatch"),
+                InlineKeyboardButton("📺 Просмотр списка", callback_data="command_list")
             ],
             [
-                InlineKeyboardButton("❓ Help", callback_data="command_help")
+                InlineKeyboardButton("❓ Помощь", callback_data="command_help")
             ]
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
@@ -602,13 +602,13 @@ class ConversationManager:
         if update.callback_query:
             context.bot.send_message(
                 chat_id=chat_id,
-                text="*Actions:*",
+                text="*Действия:*",
                 parse_mode=ParseMode.MARKDOWN,
                 reply_markup=reply_markup
             )
         else:
             update.message.reply_text(
-                "*Actions:*",
+                "*Действия:*",
                 parse_mode=ParseMode.MARKDOWN,
                 reply_markup=reply_markup
             )
@@ -649,7 +649,7 @@ class ConversationManager:
                             for season in series_details['seasons']:
                                 keyboard.append([
                                     InlineKeyboardButton(
-                                        f"Season {season['season_number']}",
+                                        f"Сезон {season['season_number']}",
                                         callback_data=SEASON_PATTERN.format(series.tmdb_id, season['season_number'])
                                     )
                                 ])
@@ -659,18 +659,18 @@ class ConversationManager:
                         for season_num in range(1, series.total_seasons + 1):
                             keyboard.append([
                                 InlineKeyboardButton(
-                                    f"Season {season_num}",
+                                    f"Сезон {season_num}",
                                     callback_data=SEASON_PATTERN.format(series.id, season_num)
                                 )
                             ])
                     
                     # Add cancel button
-                    keyboard.append([InlineKeyboardButton("Cancel", callback_data=CANCEL_PATTERN)])
+                    keyboard.append([InlineKeyboardButton("Отмена", callback_data=CANCEL_PATTERN)])
                     reply_markup = InlineKeyboardMarkup(keyboard)
                     
                     query.edit_message_text(
                         f"I've moved '{series_name}' to your watching list!\n\n"
-                        "Which season are you currently watching?",
+                        "Какой сезон вы сейчас смотрите?",
                         reply_markup=reply_markup
                     )
                     
@@ -748,7 +748,7 @@ class ConversationManager:
         
         # If no text after command, ask for series name
         update.message.reply_text(
-            'Please send me the name of the series you have watched:'
+            'Пожалуйста, отправьте мне название сериала, который вы уже посмотрели:'
         )
         return SEARCH_WATCHED
         
@@ -798,7 +798,7 @@ class ConversationManager:
             update.message.reply_text("You don't have any unwatched series.")
             return ConversationHandler.END
         
-        keyboard.append([InlineKeyboardButton("Cancel", callback_data="cancel")])
+        keyboard.append([InlineKeyboardButton("Отмена", callback_data="cancel")])
         reply_markup = InlineKeyboardMarkup(keyboard)
         
         update.message.reply_text(
@@ -832,14 +832,14 @@ class ConversationManager:
         series_name = update.message.text.strip()
         
         if not series_name:
-            update.message.reply_text("Please enter a valid series name or use /cancel to cancel.")
+            update.message.reply_text("Пожалуйста, введите корректное название сериала или используйте /cancel для отмены.")
             return MANUAL_SERIES_NAME
         
         # Save the series name
         context.user_data["manual_series_name"] = series_name
         
         update.message.reply_text(
-            "Please enter the year the series started (e.g., 2020) or 0 if unknown:"
+            "Пожалуйста, введите год начала сериала (например, 2020) или 0, если неизвестно:"
         )
         
         return MANUAL_SERIES_YEAR 
@@ -851,14 +851,14 @@ class ConversationManager:
             year = int(year_text)
             
             if year < 0:
-                update.message.reply_text("Year cannot be negative. Please enter a valid year or 0 if unknown:")
+                update.message.reply_text("Год не может быть отрицательным. Пожалуйста, введите корректный год или 0, если неизвестно:")
                 return MANUAL_SERIES_YEAR
                 
             # Save the year (or None if 0)
             context.user_data["manual_series_year"] = year if year > 0 else None
             
             update.message.reply_text(
-                "Please enter the total number of seasons (or best estimate):"
+                "Пожалуйста, введите общее количество сезонов (или приблизительное число):"
             )
             
             return MANUAL_SERIES_SEASONS
@@ -875,7 +875,7 @@ class ConversationManager:
             context.user_data["manual_series_name"] = prev_name
             update.callback_query.answer()
             update.callback_query.edit_message_text(
-                "Please enter the year the series started (e.g., 2020) or 0 if unknown:"
+                "Пожалуйста, введите год начала сериала (например, 2020) или 0, если неизвестно:"
             )
             return MANUAL_SERIES_YEAR
         # Otherwise, ask for the name
@@ -928,19 +928,19 @@ class ConversationManager:
             for season_num in range(1, total_seasons + 1):
                 keyboard.append([
                     InlineKeyboardButton(
-                        f"Season {season_num}",
+                        f"Сезон {season_num}",
                         callback_data=SEASON_PATTERN.format(series.id, season_num)
                     )
                 ])
                 
             # Add a cancel button
-            keyboard.append([InlineKeyboardButton("Cancel", callback_data=CANCEL_PATTERN)])
+            keyboard.append([InlineKeyboardButton("Отмена", callback_data=CANCEL_PATTERN)])
             
             reply_markup = InlineKeyboardMarkup(keyboard)
             
             update.message.reply_text(
-                f"I've added '{context.user_data['manual_series_name']}' to your watchlist!\n\n"
-                "Which season are you currently watching?",
+                f"Я добавил '{context.user_data['manual_series_name']}' в ваш список!\n\n"
+                "Какой сезон вы сейчас смотрите?",
                 reply_markup=reply_markup
             )
             
@@ -957,17 +957,17 @@ class ConversationManager:
         if not user:
             if update.callback_query:
                 update.callback_query.answer()
-                update.callback_query.edit_message_text("You need to add a series first. Use /add command.")
+                update.callback_query.edit_message_text("Сначала вам нужно добавить сериал. Используйте команду /add.")
             else:
-                update.message.reply_text("You need to add a series first. Use /add command.")
+                update.message.reply_text("Сначала вам нужно добавить сериал. Используйте команду /add.")
             return ConversationHandler.END
         user_series_list = self.db.get_user_series_list(user.id)
         if not user_series_list:
             if update.callback_query:
                 update.callback_query.answer()
-                update.callback_query.edit_message_text("You're not watching any series yet. Use /add command.")
+                update.callback_query.edit_message_text("Вы еще не смотрите никаких сериалов. Используйте команду /add.")
             else:
-                update.message.reply_text("You're not watching any series yet. Use /add command.")
+                update.message.reply_text("Вы еще не смотрите никаких сериалов. Используйте команду /add.")
             return ConversationHandler.END
         keyboard = []
         for user_series, series in user_series_list:
@@ -978,16 +978,16 @@ class ConversationManager:
                     callback_data=f"update_series_{series.id}"
                 )
             ])
-        keyboard.append([InlineKeyboardButton("Cancel", callback_data=CANCEL_PATTERN)])
+        keyboard.append([InlineKeyboardButton("Отмена", callback_data=CANCEL_PATTERN)])
         reply_markup = InlineKeyboardMarkup(keyboard)
         if update.callback_query:
             update.callback_query.edit_message_text(
-                "Select a series to update your progress:",
+                "Выберите сериал для обновления прогресса:",
                 reply_markup=reply_markup
             )
         else:
             update.message.reply_text(
-                "Select a series to update your progress:",
+                "Выберите сериал для обновления прогресса:",
                 reply_markup=reply_markup
             )
         return SELECTING_SERIES
@@ -1010,7 +1010,7 @@ class ConversationManager:
             for season in series_details['seasons']:
                 keyboard.append([
                     InlineKeyboardButton(
-                        f"Season {season['season_number']}",
+                        f"Сезон {season['season_number']}",
                         callback_data=SEASON_PATTERN.format(series_id, season['season_number'])
                     )
                 ])
@@ -1023,15 +1023,15 @@ class ConversationManager:
             for season_num in range(1, total_seasons + 1):
                 keyboard.append([
                     InlineKeyboardButton(
-                        f"Season {season_num}",
+                        f"Сезон {season_num}",
                         callback_data=SEASON_PATTERN.format(series_id, season_num)
                     )
                 ])
-        keyboard.append([InlineKeyboardButton("Enter season number manually", callback_data=MANUAL_SEASON_PATTERN.format(series_id))])
-        keyboard.append([InlineKeyboardButton("Cancel", callback_data=CANCEL_PATTERN)])
+        keyboard.append([InlineKeyboardButton("Ввести номер сезона вручную", callback_data=MANUAL_SEASON_PATTERN.format(series_id))])
+        keyboard.append([InlineKeyboardButton("Отмена", callback_data=CANCEL_PATTERN)])
         reply_markup = InlineKeyboardMarkup(keyboard)
         query.edit_message_text(
-            "Which season are you currently watching?",
+            "Какой сезон вы сейчас смотрите?",
             reply_markup=reply_markup
         )
         context.user_data["selected_series_id"] = series_id
