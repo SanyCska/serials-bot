@@ -95,7 +95,7 @@ class SeriesTrackerBot:
             ('watchlist', 'Сериалы в процессе просмотра'),
             # ('watchlater', 'Add series you plan to watch'),
             # ('addinwatchlater', 'Add a series you plan to watch'),
-            # ('watched', 'List all watched series'),
+            ('watched', 'Список всех просмотренных сериалов'),
             # ('addwatched', 'Add a new watched series'),
         ]
         
@@ -111,6 +111,7 @@ class SeriesTrackerBot:
         self.dispatcher.add_handler(CommandHandler("watchlater", self.conversation_manager.view_watchlist_start))
         self.dispatcher.add_handler(CommandHandler("addinwatchlater", self.conversation_manager.add_to_watchlist_start))
         self.dispatcher.add_handler(CommandHandler("addwatched", self.conversation_manager.add_watched_series_start))
+        self.dispatcher.add_handler(CommandHandler("watched", self.list_watched))
         self.dispatcher.add_handler(CommandHandler("markwatched", self.conversation_manager.mark_watched_start))
         
         # Add series conversation handler
@@ -197,6 +198,26 @@ class SeriesTrackerBot:
         )
         self.dispatcher.add_handler(update_progress_conv)
         
+        # Add watched series conversation handler (must be before generic handlers)
+        add_watched_conv = ConversationHandler(
+            entry_points=[
+                CommandHandler("addwatched", self.conversation_manager.add_watched_series_start),
+                CallbackQueryHandler(self.conversation_manager.add_watched_series_start, pattern="^command_addwatched$")
+            ],
+            states={
+                SEARCH_WATCHED: [
+                    MessageHandler(Filters.text & ~Filters.command, self.conversation_manager.search_watched_series),
+                    CommandHandler("cancel", self.conversation_manager.cancel)
+                ],
+                SELECTING_SERIES: [
+                    CallbackQueryHandler(self.conversation_manager.watched_series_selected, pattern=f"^{SERIES_PATTERN.format('.*')}$"),
+                    CallbackQueryHandler(self.conversation_manager.cancel, pattern=f"^{CANCEL_PATTERN}$")
+                ]
+            },
+            fallbacks=[CommandHandler("cancel", self.conversation_manager.cancel)]
+        )
+        self.dispatcher.add_handler(add_watched_conv)
+        
         # Command button handlers
         self.dispatcher.add_handler(CallbackQueryHandler(self.handle_command_button, pattern="^command_"))
         
@@ -231,6 +252,9 @@ class SeriesTrackerBot:
                 InlineKeyboardButton("Сериалы в процессе", callback_data="command_list")
             ],
             [
+                InlineKeyboardButton("Просмотренные сериалы", callback_data="command_watched")
+            ],
+            [
                 InlineKeyboardButton("Помощь", callback_data="command_help")
             ]
         ]
@@ -257,6 +281,9 @@ class SeriesTrackerBot:
             [
                 InlineKeyboardButton("Добавить сериал в список", callback_data="command_add"),
                 InlineKeyboardButton("Сериалы в процессе", callback_data="command_list")
+            ],
+            [
+                InlineKeyboardButton("Просмотренные сериалы", callback_data="command_watched")
             ]
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
@@ -266,8 +293,11 @@ class SeriesTrackerBot:
             "*Отслеживание сериалов, которые вы смотрите*\n"
             "/addinwatchlist - Добавить новый сериал для отслеживания прогресса\n"
             "/watchlist - Показать все сериалы, которые вы сейчас смотрите\n"
+            "/watched - Показать все просмотренные сериалы\n"
             "/help - Показать это сообщение справки\n\n"
-            "Вы также можете получить доступ к этим командам в любое время, нажав кнопку меню (☰) в нашем чате."
+            "*Дополнительно*\n"
+            "/addwatched - Добавить сериал, который вы уже посмотрели\n"
+            "\nВы также можете получить доступ к этим командам в любое время, нажав кнопку меню (☰) в нашем чате."
         )
         
         # Determine if this is from a callback or direct command
@@ -354,6 +384,9 @@ class SeriesTrackerBot:
                 [
                     # InlineKeyboardButton("📺 Watch later", callback_data="command_watchlist"),
                     InlineKeyboardButton("❓ Помощь", callback_data="command_help")
+                ],
+                [
+                    InlineKeyboardButton("Просмотренные сериалы", callback_data="command_watched")
                 ]
             ]
             reply_markup = InlineKeyboardMarkup(keyboard)
@@ -456,6 +489,10 @@ class SeriesTrackerBot:
             logger.info("Showing watchlist...")
             query.answer("Showing watchlist...")
             return self.conversation_manager.view_watchlist_start(update, context)
+        elif command == 'watched':
+            logger.info("Showing watched series...")
+            query.answer("Showing watched series...")
+            return self.list_watched(update, context)
         elif command == 'help':
             logger.info("Showing help...")
             query.answer("Showing help...")
@@ -552,7 +589,8 @@ class SeriesTrackerBot:
                     ],
                     [
                         # InlineKeyboardButton("📺 Watch later", callback_data="command_watchlist"),
-                        InlineKeyboardButton("❓ Помощь", callback_data="command_help")
+                        InlineKeyboardButton("❓ Помощь", callback_data="command_help"),
+                        InlineKeyboardButton("Просмотренные сериалы", callback_data="command_watched")
                     ]
                 ]
                 reply_markup = InlineKeyboardMarkup(keyboard)
@@ -653,54 +691,46 @@ class SeriesTrackerBot:
         
     def list_watched(self, update: Update, context: CallbackContext):
         """List all watched series for a user."""
-        user = self.db.get_user(update.effective_user.id)
-        
+        if update.callback_query:
+            query = update.callback_query
+            user = self.db.get_user(query.from_user.id)
+            send = lambda text, **kwargs: query.edit_message_text(text, **kwargs)
+        else:
+            user = self.db.get_user(update.effective_user.id)
+            send = lambda text, **kwargs: update.message.reply_text(text, **kwargs)
+
         if not user:
-            update.message.reply_text("You haven't added any series yet. Use /addwatched to add your first watched series.")
+            send("Вы ещё не добавили ни одного сериала. Используйте /addwatched, чтобы добавить первый просмотренный сериал.")
             return
-            
+
         series_list = self.db.get_user_series_list(user.id, watched_only=True)
-        
+
         if not series_list:
-            # Create keyboard with options
             keyboard = [
-                [InlineKeyboardButton("Add Watched Series", callback_data="command_addwatched")],
-                [InlineKeyboardButton("View Watching List", callback_data="command_list")],
-                [InlineKeyboardButton("Watch later", callback_data="command_watchlist")]
+                [InlineKeyboardButton("Добавить просмотренный сериал", callback_data="command_addwatched")],
+                [InlineKeyboardButton("Смотрю сейчас", callback_data="command_list")],
             ]
             reply_markup = InlineKeyboardMarkup(keyboard)
-            
-            update.message.reply_text(
-                "You haven't marked any series as watched yet.\n"
-                "Use /addwatched to add series you've already watched.",
+            send(
+                "Вы ещё не отметили ни один сериал как просмотренный.\nИспользуйте /addwatched, чтобы добавить уже просмотренные сериалы.",
                 reply_markup=reply_markup
             )
             return
-            
-        message = "*Your Watched Series:*\n\n"
-        
-        # Create keyboard for actions
-        keyboard = []
-        
+
+        message = "*Ваши просмотренные сериалы:*\n\n"
         for user_series, series in series_list:
             year_str = f" ({series.year})" if series.year else ""
-            watched_date = user_series.watched_date.strftime("%Y-%m-%d") if user_series.watched_date else "Unknown date"
+            watched_date = user_series.watched_date.strftime("%Y-%m-%d") if user_series.watched_date else "Неизвестная дата"
             message += f"• *{series.name}*{year_str}\n"
-            message += f"  Completed on: {watched_date}\n\n"
-        
-        # Add action buttons
-        keyboard.append([
-            InlineKeyboardButton("Add More Watched", callback_data="command_addwatched"),
-            InlineKeyboardButton("View Watching", callback_data="command_list")
-        ])
-        keyboard.append([
-            InlineKeyboardButton("Watch later", callback_data="command_watchlist"),
-            InlineKeyboardButton("Help", callback_data="command_help")
-        ])
-        
+            message += f"  Просмотр завершён: {watched_date}\n\n"
+
+        keyboard = [
+            [InlineKeyboardButton("Добавить просмотренный сериал", callback_data="command_addwatched")],
+            [InlineKeyboardButton("Смотрю сейчас", callback_data="command_list")],
+            [InlineKeyboardButton("Помощь", callback_data="command_help")]
+        ]
         reply_markup = InlineKeyboardMarkup(keyboard)
-        
-        update.message.reply_text(
+        send(
             message,
             parse_mode=ParseMode.MARKDOWN,
             reply_markup=reply_markup

@@ -739,13 +739,24 @@ class ConversationManager:
         """Start the conversation to add a watched series."""
         # Set the context to indicate this is for adding a watched series
         context.user_data["is_watched"] = True
-        
+
+        # If called from a callback button
+        if update.callback_query:
+            chat_id = update.callback_query.message.chat_id
+            update.callback_query.answer()
+            context.bot.send_message(
+                chat_id=chat_id,
+                text='Пожалуйста, отправьте мне название сериала, который вы уже посмотрели:'
+            )
+            return SEARCH_WATCHED
+
+        # If called from a command
         # Check if there's text after the command
         query = update.message.text.replace('/addwatched', '').strip()
         if query:
             # If there's text after the command, go directly to search
             return self.search_series(update, context, query=query, is_watched=True)
-        
+
         # If no text after command, ask for series name
         update.message.reply_text(
             'Пожалуйста, отправьте мне название сериала, который вы уже посмотрели:'
@@ -758,24 +769,37 @@ class ConversationManager:
         return self.search_series(update, context, query=update.message.text, is_watched=True)
         
     def watched_series_selected(self, update: Update, context: CallbackContext) -> int:
-        """Handle series selection for watched series."""
         query = update.callback_query
         query.answer()
-        
+
         series_id = int(query.data.split('_')[1])
-        user_id = update.effective_user.id
-        
-        series = self.tmdb.get_series_details(series_id)
-        if not series:
+        user = self.db.get_user(update.effective_user.id)
+
+        if not user:
+            query.edit_message_text("Error: User not found.")
+            return ConversationHandler.END
+
+        # 1. Получить детали сериала
+        series_details = self.tmdb.get_series_details(series_id)
+        if not series_details:
             query.edit_message_text('Sorry, I could not find that series.')
             return ConversationHandler.END
-            
-        self.db.add_watched_series(user_id, series_id)
-        
-        query.edit_message_text(
-            f'Added "{series.name}" to your watched series list!'
+
+        # 2. Добавить сериал в таблицу series (или получить его)
+        local_series = self.db.add_series(
+            series_details['id'],
+            series_details['name'],
+            series_details.get('year'),
+            series_details.get('total_seasons')
         )
-        return ConversationHandler.END 
+
+        # 3. Добавить в user_series с использованием local_series.id
+        self.db.add_watched_series(user.id, local_series.id)
+
+        query.edit_message_text(
+            f'Added "{local_series.name}" to your watched series list!'
+        )
+        return ConversationHandler.END
 
     def mark_watched_start(self, update: Update, context: CallbackContext) -> int:
         """Start the process of marking a series as watched."""
