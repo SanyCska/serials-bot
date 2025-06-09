@@ -746,7 +746,7 @@ class SeriesTrackerBot:
             user = self.db.get_user(query.from_user.id)
             
             if not user:
-                query.edit_message_text("Error: User not found.")
+                query.edit_message_text("Ошибка: пользователь не найден.")
                 return
             
             # Get series name before marking as watched
@@ -759,14 +759,14 @@ class SeriesTrackerBot:
             
             # Mark the series as watched
             if self.db.mark_as_watched(user.id, series_id):
-                message = f"✅ I've marked '{series_name}' as watched and moved it to your watched list!"
+                message = f"✅ Я отметил '{series_name}' как просмотренный и переместил его в ваш список просмотренных!"
                 
                 query.edit_message_text(message)
             else:
-                query.edit_message_text("Error marking series as watched. Please try again later.")
+                query.edit_message_text("Ошибка при отметке сериала как просмотренного. Пожалуйста, попробуйте позже.")
         except Exception as e:
             logger.error(f"Error marking series as watched: {e}", exc_info=True)
-            query.edit_message_text("An error occurred while marking the series as watched. Please try again.")
+            query.edit_message_text("Произошла ошибка при отметке сериала как просмотренного. Пожалуйста, попробуйте ещё раз.")
         
     def remove_series_callback(self, update: Update, context: CallbackContext) -> None:
         """Handle removing a series from the user's watching list."""
@@ -776,17 +776,17 @@ class SeriesTrackerBot:
             series_id = int(query.data.split('_')[2])
             user = self.db.get_user(query.from_user.id)
             if not user:
-                query.edit_message_text("Error: User not found.")
+                query.edit_message_text("Ошибка: пользователь не найден.")
                 return
             # Remove the series from user's watching list
             removed = self.db.remove_user_series(user.id, series_id)
             if removed:
-                query.edit_message_text("✅ Series has been removed from your watching list.")
+                query.edit_message_text("✅ Сериал был удалён из вашего списка просмотра.")
             else:
-                query.edit_message_text("❌ Failed to remove the series. Please try again later.")
+                query.edit_message_text("❌ Не удалось удалить сериал. Пожалуйста, попробуйте позже.")
         except Exception as e:
             logger.error(f"Error removing series: {e}", exc_info=True)
-            query.edit_message_text("An error occurred while removing the series. Please try again.")
+            query.edit_message_text("Произошла ошибка при удалении сериала. Пожалуйста, попробуйте ещё раз.")
         
 def main():
     """Start the bot."""

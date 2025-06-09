@@ -797,7 +797,7 @@ class ConversationManager:
         self.db.add_watched_series(user.id, local_series.id)
 
         query.edit_message_text(
-            f'Added "{local_series.name}" to your watched series list!'
+            f'"{local_series.name}" добавлен в список просмотренных сериалов'
         )
         return ConversationHandler.END
 

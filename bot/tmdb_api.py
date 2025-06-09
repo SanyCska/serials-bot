@@ -12,6 +12,7 @@ class TMDBApi:
     def __init__(self):
         self.tmdb = TMDb()
         self.tmdb.api_key = os.getenv('TMDB_API_KEY')
+        self.tmdb.language = 'ru-RU'
         self.tv = TV()
         
     def search_series(self, query):
