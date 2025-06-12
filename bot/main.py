@@ -108,8 +108,8 @@ class SeriesTrackerBot:
         self.dispatcher.add_handler(CommandHandler("start", self.start))
         self.dispatcher.add_handler(CommandHandler("help", self.help_command))
         self.dispatcher.add_handler(CommandHandler("watchlist", self.list_series))
-        self.dispatcher.add_handler(CommandHandler("watchlater", self.conversation_manager.view_watchlist_start))
-        self.dispatcher.add_handler(CommandHandler("addinwatchlater", self.conversation_manager.add_to_watchlist_start))
+        self.dispatcher.add_handler(CommandHandler("watchlater", self.conversation_manager.view_watch_later_start))
+        self.dispatcher.add_handler(CommandHandler("addinwatchlater", self.conversation_manager.add_to_watch_later_start))
         self.dispatcher.add_handler(CommandHandler("addwatched", self.conversation_manager.add_watched_series_start))
         self.dispatcher.add_handler(CommandHandler("watched", self.list_watched))
         self.dispatcher.add_handler(CommandHandler("markwatched", self.conversation_manager.mark_watched_start))
@@ -221,8 +221,8 @@ class SeriesTrackerBot:
         # Add watch later conversation handler
         add_watchlater_conv = ConversationHandler(
             entry_points=[
-                CommandHandler("addinwatchlater", self.conversation_manager.add_to_watchlist_start),
-                CallbackQueryHandler(self.conversation_manager.add_to_watchlist_start, pattern="^command_addwatch$")
+                CommandHandler("addinwatchlater", self.conversation_manager.add_to_watch_later_start),
+                CallbackQueryHandler(self.conversation_manager.add_to_watch_later_start, pattern="^command_addwatch$")
             ],
             states={
                 SELECTING_SERIES: [
@@ -487,7 +487,7 @@ class SeriesTrackerBot:
         
     def view_watchlist(self, update: Update, context: CallbackContext) -> None:
         """View the user's watchlist"""
-        self.conversation_manager.view_watchlist_start(update, context)
+        self.conversation_manager.view_watch_later_start(update, context)
         
     def handle_command_button(self, update: Update, context: CallbackContext) -> None:
         """Handle command buttons."""
@@ -502,7 +502,7 @@ class SeriesTrackerBot:
         elif command == 'addwatch':
             logger.info("Starting add to watchlist process...")
             query.answer("Starting add to watchlist process...")
-            return self.conversation_manager.add_to_watchlist_start(update, context)
+            return self.conversation_manager.add_to_watch_later_start(update, context)
         elif command == 'list':
             logger.info("Showing series list...")
             query.answer("Showing series list...")
@@ -510,7 +510,7 @@ class SeriesTrackerBot:
         elif command == 'watchlist':
             logger.info("Showing watchlist...")
             query.answer("Showing watchlist...")
-            return self.conversation_manager.view_watchlist_start(update, context)
+            return self.conversation_manager.view_watch_later_start(update, context)
         elif command == 'watched':
             logger.info("Showing watched series...")
             query.answer("Showing watched series...")

@@ -534,7 +534,7 @@ class ConversationManager:
         
         return ConversationHandler.END
 
-    def add_to_watchlist_start(self, update: Update, context: CallbackContext) -> int:
+    def add_to_watch_later_start(self, update: Update, context: CallbackContext) -> int:
         """Start the add to watchlist conversation"""
         # Handle callback query case
         if update.callback_query:
@@ -551,7 +551,7 @@ class ConversationManager:
         
         return SELECTING_SERIES
     
-    def view_watchlist_start(self, update: Update, context: CallbackContext) -> int:
+    def view_watch_later_start(self, update: Update, context: CallbackContext) -> int:
         """Start the watchlist viewing process."""
         # Get user from database
         user = self.db.get_user(update.effective_user.id if update.effective_user else update.callback_query.from_user.id)
