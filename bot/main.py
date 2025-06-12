@@ -93,8 +93,8 @@ class SeriesTrackerBot:
             ('help', 'Показать справку'),
             ('addinwatchlist', "Добавить новый сериал для отслеживания"),
             ('watchlist', 'Сериалы в процессе просмотра'),
-            # ('watchlater', 'Add series you plan to watch'),
-            # ('addinwatchlater', 'Add a series you plan to watch'),
+            ('watchlater', 'Сериалы, которые планируете посмотреть'),
+            ('addinwatchlater', 'Добавить сериал в список "Посмотреть позже"'),
             ('watched', 'Список всех просмотренных сериалов'),
             # ('addwatched', 'Add a new watched series'),
         ]
@@ -217,6 +217,28 @@ class SeriesTrackerBot:
             fallbacks=[CommandHandler("cancel", self.conversation_manager.cancel)]
         )
         self.dispatcher.add_handler(add_watched_conv)
+        
+        # Add watch later conversation handler
+        add_watchlater_conv = ConversationHandler(
+            entry_points=[
+                CommandHandler("addinwatchlater", self.conversation_manager.add_to_watchlist_start),
+                CallbackQueryHandler(self.conversation_manager.add_to_watchlist_start, pattern="^command_addwatch$")
+            ],
+            states={
+                SELECTING_SERIES: [
+                    MessageHandler(Filters.text & ~Filters.command, self.conversation_manager.search_series),
+                    CallbackQueryHandler(self.conversation_manager.watchlater_series_selected, pattern=f"^{SERIES_PATTERN.format('.*')}$"),
+                    CallbackQueryHandler(self.conversation_manager.cancel, pattern=f"^{CANCEL_PATTERN}$"),
+                    CommandHandler("cancel", self.conversation_manager.cancel)
+                ],
+                SERIES_SELECTION: [
+                    CallbackQueryHandler(self.conversation_manager.watchlater_series_selected, pattern=f"^{SERIES_PATTERN.format('.*')}$"),
+                    CallbackQueryHandler(self.conversation_manager.cancel, pattern=f"^{CANCEL_PATTERN}$")
+                ]
+            },
+            fallbacks=[CommandHandler("cancel", self.conversation_manager.cancel)]
+        )
+        self.dispatcher.add_handler(add_watchlater_conv)
         
         # Command button handlers
         self.dispatcher.add_handler(CallbackQueryHandler(self.handle_command_button, pattern="^command_"))

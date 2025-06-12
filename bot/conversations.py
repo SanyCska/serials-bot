@@ -125,18 +125,18 @@ class ConversationManager:
             )
         
         return SELECTING_SERIES
-        
+
     def series_selected(self, update: Update, context: CallbackContext) -> int:
         """Handle series selection"""
         query = update.callback_query
         logger.info(f"Series selection callback received: {query.data}")
         query.answer()
-        
+
         if query.data == CANCEL_PATTERN:
             logger.info("Series selection cancelled")
             query.edit_message_text("Операция отменена.")
             return ConversationHandler.END
-            
+
         # Check if this is a manual add request
         if query.data == MANUAL_ADD_PATTERN:
             logger.info("Manual add request received")
@@ -144,7 +144,7 @@ class ConversationManager:
                 "Пожалуйста, введите точное название сериала, который вы хотите добавить:"
             )
             return MANUAL_SERIES_NAME
-            
+
         # Extract series ID from callback data
         try:
             series_id = int(query.data.split("_")[1])
@@ -153,10 +153,10 @@ class ConversationManager:
             logger.error(f"Error parsing series ID from callback data: {query.data}, error: {e}")
             query.edit_message_text("Error processing your selection. Please try again.")
             return ConversationHandler.END
-        
+
         # Get series details from TMDB
         series_details = self.tmdb.get_series_details(series_id)
-        
+
         # Always add the series to the local DB and add the user to the series (if not already present)
         user = self.db.add_user(
             query.from_user.id,
@@ -192,7 +192,8 @@ class ConversationManager:
                 ])
         else:
             # Try to get from local DB (manual series)
-            logger.warning(f"TMDB not found or no seasons for series ID: {series_id}, trying local DB for manual series.")
+            logger.warning(
+                f"TMDB not found or no seasons for series ID: {series_id}, trying local DB for manual series.")
             local_series = self.db.get_series_by_id(series_id)
             if not local_series:
                 logger.error(f"Failed to retrieve manual series details for ID: {series_id}")
@@ -211,7 +212,8 @@ class ConversationManager:
                     )
                 ])
         # Add a manual season entry option
-        keyboard.append([InlineKeyboardButton("Ввести номер сезона вручную", callback_data=MANUAL_SEASON_PATTERN.format(series_id))])
+        keyboard.append([InlineKeyboardButton("Ввести номер сезона вручную",
+                                              callback_data=MANUAL_SEASON_PATTERN.format(series_id))])
         # Add a cancel button
         keyboard.append([InlineKeyboardButton("Отмена", callback_data=CANCEL_PATTERN)])
         reply_markup = InlineKeyboardMarkup(keyboard)
@@ -222,6 +224,39 @@ class ConversationManager:
         # Save selected series_id for later steps
         context.user_data["selected_series_id"] = series_id
         return SELECTING_SEASON
+
+    def watchlater_series_selected(self, update: Update, context: CallbackContext) -> int:
+        """Handle series selection for watch later list only."""
+        query = update.callback_query
+        query.answer()
+
+        series_id = int(query.data.split('_')[1])
+        user = self.db.get_user(update.effective_user.id)
+
+        if not user:
+            query.edit_message_text("Error: User not found.")
+            return ConversationHandler.END
+
+        # Get series details from TMDB
+        series_details = self.tmdb.get_series_details(series_id)
+        if not series_details:
+            query.edit_message_text('Sorry, I could not find that series.')
+            return ConversationHandler.END
+
+        # Add series to DB
+        local_series = self.db.add_series(
+            series_details['id'],
+            series_details['name'],
+            series_details.get('year'),
+            series_details.get('total_seasons')
+        )
+
+        # Add to user's watch later list
+        self.db.add_user_series(user.id, local_series.id, in_watchlist=True)
+        query.edit_message_text(
+            f'"{local_series.name}" добавлен в список "Посмотреть позже"'
+        )
+        return ConversationHandler.END
 
     def season_selected(self, update: Update, context: CallbackContext) -> int:
         """Handle season selection"""
