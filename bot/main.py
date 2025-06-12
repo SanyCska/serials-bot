@@ -117,48 +117,48 @@ class SeriesTrackerBot:
         self.dispatcher.add_handler(CommandHandler("watched", self.list_watched))
         self.dispatcher.add_handler(CommandHandler("markwatched", self.conversation_manager.mark_watched_start))
         
-        # Add series conversation handler
+        # Add series in watchlist conversation handler
         add_series_conv = ConversationHandler(
             entry_points=[
-                CommandHandler("add", self.conversation_manager.add_series_start),
-                CommandHandler("addinwatchlist", self.conversation_manager.add_series_start),
-                CallbackQueryHandler(self.conversation_manager.add_series_start, pattern="^command_add$")
+                CommandHandler("add", self.watchlist_handlers.add_series_start),
+                CommandHandler("addinwatchlist", self.watchlist_handlers.add_series_start),
+                CallbackQueryHandler(self.watchlist_handlers.add_series_start, pattern="^command_add$")
             ],
             states={
                 SELECTING_SERIES: [
                     MessageHandler(Filters.text & ~Filters.command, self.conversation_manager.search_series),
-                    CallbackQueryHandler(self.conversation_manager.series_selected, pattern=f"^{SERIES_PATTERN.format('.*')}$"),
-                    CallbackQueryHandler(self.conversation_manager.manual_series_name_prompt, pattern=f"^{MANUAL_ADD_PATTERN}$"),
+                    CallbackQueryHandler(self.watchlist_handlers.series_selected, pattern=f"^{SERIES_PATTERN.format('.*')}$"),
+                    CallbackQueryHandler(self.watchlist_handlers.manual_series_name_prompt, pattern=f"^{MANUAL_ADD_PATTERN}$"),
                     CallbackQueryHandler(self.conversation_manager.cancel, pattern=f"^{CANCEL_PATTERN}$")
                 ],
                 MANUAL_SERIES_NAME: [
-                    MessageHandler(Filters.text & ~Filters.command, self.conversation_manager.manual_series_name_entered),
+                    MessageHandler(Filters.text & ~Filters.command, self.watchlist_handlers.manual_series_name_entered),
                     CommandHandler("cancel", self.conversation_manager.cancel)
                 ],
                 MANUAL_SERIES_YEAR: [
-                    MessageHandler(Filters.text & ~Filters.command, self.conversation_manager.manual_series_year_entered),
+                    MessageHandler(Filters.text & ~Filters.command, self.watchlist_handlers.manual_series_year_entered),
                     CommandHandler("cancel", self.conversation_manager.cancel)
                 ],
                 MANUAL_SERIES_SEASONS: [
-                    MessageHandler(Filters.text & ~Filters.command, self.conversation_manager.manual_series_seasons_entered),
+                    MessageHandler(Filters.text & ~Filters.command, self.watchlist_handlers.manual_series_seasons_entered),
                     CommandHandler("cancel", self.conversation_manager.cancel)
                 ],
                 SELECTING_SEASON: [
-                    CallbackQueryHandler(self.conversation_manager.season_selected, pattern=f"^{SEASON_PATTERN.format('.*', '.*')}$"),
-                    CallbackQueryHandler(self.conversation_manager.manual_season_entry, pattern=f"^{MANUAL_SEASON_PATTERN.format('.*')}$"),
+                    CallbackQueryHandler(self.watchlist_handlers.season_selected, pattern=f"^{SEASON_PATTERN.format('.*', '.*')}$"),
+                    CallbackQueryHandler(self.watchlist_handlers.manual_season_entry, pattern=f"^{MANUAL_SEASON_PATTERN.format('.*')}$"),
                     CallbackQueryHandler(self.conversation_manager.cancel, pattern=f"^{CANCEL_PATTERN}$")
                 ],
                 MANUAL_SEASON_ENTRY: [
-                    MessageHandler(Filters.text & ~Filters.command, self.conversation_manager.manual_season_entry),
+                    MessageHandler(Filters.text & ~Filters.command, self.watchlist_handlers.manual_season_entry),
                     CommandHandler("cancel", self.conversation_manager.cancel)
                 ],
                 SELECTING_EPISODE: [
-                    CallbackQueryHandler(self.conversation_manager.episode_selected, pattern=f"^{EPISODE_PATTERN.format('.*', '.*', '.*')}$"),
-                    CallbackQueryHandler(self.conversation_manager.manual_episode_entry, pattern=f"^{MANUAL_ENTRY_PATTERN.format('.*', '.*')}$"),
+                    CallbackQueryHandler(self.watchlist_handlers.episode_selected, pattern=f"^{EPISODE_PATTERN.format('.*', '.*', '.*')}$"),
+                    CallbackQueryHandler(self.watchlist_handlers.manual_episode_entry, pattern=f"^{MANUAL_ENTRY_PATTERN.format('.*', '.*')}$"),
                     CallbackQueryHandler(self.conversation_manager.cancel, pattern=f"^{CANCEL_PATTERN}$")
                 ],
                 MANUAL_EPISODE_ENTRY: [
-                    MessageHandler(Filters.text & ~Filters.command, self.conversation_manager.manual_episode_entry),
+                    MessageHandler(Filters.text & ~Filters.command, self.watchlist_handlers.manual_episode_entry),
                     CommandHandler("cancel", self.conversation_manager.cancel)
                 ]
             },
@@ -179,21 +179,21 @@ class SeriesTrackerBot:
                     CallbackQueryHandler(self.conversation_manager.cancel, pattern=f"^{CANCEL_PATTERN}$")
                 ],
                 SELECTING_SEASON: [
-                    CallbackQueryHandler(self.conversation_manager.season_selected, pattern=f"^{SEASON_PATTERN.format('.*', '.*')}$"),
-                    CallbackQueryHandler(self.conversation_manager.manual_season_entry, pattern=f"^{MANUAL_SEASON_PATTERN.format('.*')}$"),
+                    CallbackQueryHandler(self.watchlist_handlers.season_selected, pattern=f"^{SEASON_PATTERN.format('.*', '.*')}$"),
+                    CallbackQueryHandler(self.watchlist_handlers.manual_season_entry, pattern=f"^{MANUAL_SEASON_PATTERN.format('.*')}$"),
                     CallbackQueryHandler(self.conversation_manager.cancel, pattern=f"^{CANCEL_PATTERN}$")
                 ],
                 MANUAL_SEASON_ENTRY: [
-                    MessageHandler(Filters.text & ~Filters.command, self.conversation_manager.manual_season_entry),
+                    MessageHandler(Filters.text & ~Filters.command, self.watchlist_handlers.manual_season_entry),
                     CommandHandler("cancel", self.conversation_manager.cancel)
                 ],
                 SELECTING_EPISODE: [
-                    CallbackQueryHandler(self.conversation_manager.episode_selected, pattern=f"^{EPISODE_PATTERN.format('.*', '.*', '.*')}$"),
-                    CallbackQueryHandler(self.conversation_manager.manual_episode_entry, pattern=f"^{MANUAL_ENTRY_PATTERN.format('.*', '.*')}$"),
+                    CallbackQueryHandler(self.watchlist_handlers.episode_selected, pattern=f"^{EPISODE_PATTERN.format('.*', '.*', '.*')}$"),
+                    CallbackQueryHandler(self.watchlist_handlers.manual_episode_entry, pattern=f"^{MANUAL_ENTRY_PATTERN.format('.*', '.*')}$"),
                     CallbackQueryHandler(self.conversation_manager.cancel, pattern=f"^{CANCEL_PATTERN}$")
                 ],
                 MANUAL_EPISODE_ENTRY: [
-                    MessageHandler(Filters.text & ~Filters.command, self.conversation_manager.manual_episode_entry),
+                    MessageHandler(Filters.text & ~Filters.command, self.watchlist_handlers.manual_episode_entry),
                     CommandHandler("cancel", self.conversation_manager.cancel)
                 ]
             },
@@ -417,7 +417,7 @@ class SeriesTrackerBot:
         if command == 'add':
             logger.info("Starting add series process...")
             query.answer("Starting add series process...")
-            return self.conversation_manager.add_series_start(update, context)
+            return self.watchlist_handlers.add_series_start(update, context)
         elif command == 'list':
             logger.info("Showing series list...")
             query.answer("Showing series list...")
@@ -447,29 +447,29 @@ class SeriesTrackerBot:
             query.answer("Unknown command")
             return ConversationHandler.END
         
-    def check_updates_callback(self, update: Update, context: CallbackContext) -> None:
-        """Check updates from callback query"""
-        query = update.callback_query
-        logger.info("Processing check updates callback")
-        # Run a manual check
-        result = self.scheduler.manual_check(query.from_user.id)
-        logger.info(f"Manual check result for user {query.from_user.id}: {result}")
-        # Add buttons for after check
-        keyboard = [
-            [
-                InlineKeyboardButton("My List", callback_data="command_list"),
-                InlineKeyboardButton("Update Progress", callback_data="command_update")
-            ],
-            [
-                InlineKeyboardButton("Add Series", callback_data="command_add"),
-                InlineKeyboardButton("Help", callback_data="command_help")
-            ]
-        ]
-        reply_markup = InlineKeyboardMarkup(keyboard)
-        try:
-            query.edit_message_text(result, reply_markup=reply_markup)
-        except Exception as e:
-            logger.error(f"Error updating message with check results: {e}")
+    # def check_updates_callback(self, update: Update, context: CallbackContext) -> None:
+    #     """Check updates from callback query"""
+    #     query = update.callback_query
+    #     logger.info("Processing check updates callback")
+    #     # Run a manual check
+    #     result = self.scheduler.manual_check(query.from_user.id)
+    #     logger.info(f"Manual check result for user {query.from_user.id}: {result}")
+    #     # Add buttons for after check
+    #     keyboard = [
+    #         [
+    #             InlineKeyboardButton("My List", callback_data="command_list"),
+    #             InlineKeyboardButton("Update Progress", callback_data="command_update")
+    #         ],
+    #         [
+    #             InlineKeyboardButton("Add Series", callback_data="command_add"),
+    #             InlineKeyboardButton("Help", callback_data="command_help")
+    #         ]
+    #     ]
+    #     reply_markup = InlineKeyboardMarkup(keyboard)
+    #     try:
+    #         query.edit_message_text(result, reply_markup=reply_markup)
+    #     except Exception as e:
+    #         logger.error(f"Error updating message with check results: {e}")
         
     def move_to_watchlist(self, update: Update, context: CallbackContext) -> None:
         """Move a series from watching to watchlist"""
