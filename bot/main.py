@@ -112,7 +112,7 @@ class SeriesTrackerBot:
         self.dispatcher.add_handler(CommandHandler("watchlist", self.list_series))
         self.dispatcher.add_handler(CommandHandler("watchlater", self.conversation_manager.view_watch_later_start))
         self.dispatcher.add_handler(CommandHandler("addinwatchlater", self.conversation_manager.add_to_watch_later_start))
-        self.dispatcher.add_handler(CommandHandler("addwatched", self.conversation_manager.add_watched_series_start))
+        self.dispatcher.add_handler(CommandHandler("addwatched", self.watched_handlers.add_watched_series_start))
         self.dispatcher.add_handler(CommandHandler("watched", self.watched_handlers.list_watched))
         self.dispatcher.add_handler(CommandHandler("markwatched", self.conversation_manager.mark_watched_start))
         
@@ -203,16 +203,16 @@ class SeriesTrackerBot:
         # Add watched series conversation handler (must be before generic handlers)
         add_watched_conv = ConversationHandler(
             entry_points=[
-                CommandHandler("addwatched", self.conversation_manager.add_watched_series_start),
-                CallbackQueryHandler(self.conversation_manager.add_watched_series_start, pattern="^command_addwatched$")
+                CommandHandler("addwatched", self.watched_handlers.add_watched_series_start),
+                CallbackQueryHandler(self.watched_handlers.add_watched_series_start, pattern="^command_addwatched$")
             ],
             states={
                 SEARCH_WATCHED: [
-                    MessageHandler(Filters.text & ~Filters.command, self.conversation_manager.search_watched_series),
+                    MessageHandler(Filters.text & ~Filters.command, self.watched_handlers.search_watched_series),
                     CommandHandler("cancel", self.conversation_manager.cancel)
                 ],
                 SELECTING_SERIES: [
-                    CallbackQueryHandler(self.conversation_manager.watched_series_selected, pattern=f"^{SERIES_PATTERN.format('.*')}$"),
+                    CallbackQueryHandler(self.watched_handlers.watched_series_selected, pattern=f"^{SERIES_PATTERN.format('.*')}$"),
                     CallbackQueryHandler(self.conversation_manager.cancel, pattern=f"^{CANCEL_PATTERN}$")
                 ]
             },
@@ -440,7 +440,7 @@ class SeriesTrackerBot:
         elif command == 'addwatched':
             logger.info("Starting add watched series process...")
             query.answer("Starting add watched series process...")
-            return self.conversation_manager.add_watched_series_start(update, context)
+            return self.watched_handlers.add_watched_series_start(update, context)
         else:
             logger.warning(f"Unknown command button: {command}")
             query.answer("Unknown command")
