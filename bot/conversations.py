@@ -30,9 +30,10 @@ logger = logging.getLogger(__name__)
 
 class ConversationManager:
     """Manages conversation states for the bot."""
-    def __init__(self):
-        self.db = DBHandler()
-        self.tmdb = TMDBApi()
+    def __init__(self, db, tmdb):
+        """Initialize the conversation manager with database and TMDB API handlers."""
+        self.db = db
+        self.tmdb = tmdb
         
     def add_series_start(self, update: Update, context: CallbackContext) -> int:
         """Start the add series conversation"""

@@ -41,6 +41,7 @@ from bot.conversations import (
     MANUAL_SEASON_PATTERN,
     MANUAL_ENTRY_PATTERN,
 )
+from bot.watchlist_handlers import WatchlistHandlers
 
 # Load environment variables
 load_dotenv()
@@ -60,14 +61,16 @@ def health_check():
     return 'Bot is running'
 
 class SeriesTrackerBot:
-    def __init__(self):
-        # Initialize database
-        init_db()
-        
-        # Initialize handlers
-        self.db = DBHandler()
-        self.tmdb = TMDBApi()
-        self.conversation_manager = ConversationManager()
+    def __init__(self, token, db, tmdb, webhook_url=None, port=8443):
+        """Initialize the bot with the given token and database handler."""
+        self.updater = Updater(token)
+        self.dispatcher = self.updater.dispatcher
+        self.db = db
+        self.tmdb = tmdb
+        self.webhook_url = webhook_url
+        self.port = port
+        self.conversation_manager = ConversationManager(db, tmdb)
+        self.watchlist_handlers = WatchlistHandlers(db, tmdb)
         
         # Set up the Telegram bot with higher timeout
         request_kwargs = {
@@ -331,123 +334,7 @@ class SeriesTrackerBot:
         
     def list_series(self, update: Update, context: CallbackContext) -> None:
         """List all TV series the user is watching."""
-        logger.info(f"List command received from user {update.effective_user.id}")
-        user = self.db.get_user(update.effective_user.id)
-        
-        if not user:
-            logger.warning(f"User not found in database for telegram_id: {update.effective_user.id}")
-            # Create keyboard with options
-            keyboard = [
-                [InlineKeyboardButton("Добавить сериал", callback_data="command_add")],
-                [InlineKeyboardButton("Помощь", callback_data="command_help")]
-            ]
-            reply_markup = InlineKeyboardMarkup(keyboard)
-            if update.callback_query:
-                update.callback_query.edit_message_text(
-                    "Сначала вам нужно добавить сериал. Используйте команду /add или кнопку ниже.",
-                    reply_markup=reply_markup
-                )
-            else:
-                update.message.reply_text(
-                    "Сначала вам нужно добавить сериал. Используйте команду /add или кнопку ниже.",
-                    reply_markup=reply_markup
-                )
-            return
-            
-        user_series_list = self.db.get_user_series_list(user.id)
-        logger.info(f"Retrieved {len(user_series_list) if user_series_list else 0} series for user {user.id}")
-        
-        if not user_series_list:
-            logger.info(f"No series found for user {user.id}")
-            # Create keyboard with options
-            keyboard = [
-                [InlineKeyboardButton("Добавить сериал", callback_data="command_add")],
-                [InlineKeyboardButton("Помощь", callback_data="command_help")]
-            ]
-            reply_markup = InlineKeyboardMarkup(keyboard)
-            if update.callback_query:
-                update.callback_query.edit_message_text(
-                    "Вы еще не смотрите никаких сериалов. Используйте команду /addinwatchlist или кнопку ниже.",
-                    reply_markup=reply_markup
-                )
-            else:
-                update.message.reply_text(
-                    "Вы еще не смотрите никаких сериалов. Используйте команду /addinwatchlist или кнопку ниже.",
-                    reply_markup=reply_markup
-                )
-            return
-            
-        # Send header message
-        try:
-            if update.callback_query:
-                update.callback_query.edit_message_text("*Ваш список просматриваемых сериалов:*", parse_mode=ParseMode.MARKDOWN)
-                chat_id = update.callback_query.message.chat_id
-            else:
-                update.message.reply_text("*Ваш список просматриваемых сериалов:*", parse_mode=ParseMode.MARKDOWN)
-                chat_id = update.message.chat_id
-            logger.info("Sent header message")
-        except Exception as e:
-            logger.error(f"Error sending header message: {e}")
-            return
-        
-        # Send each series as a separate message
-        for user_series, series in user_series_list:
-            try:
-                year_str = f" ({series.year})" if series.year else ""
-                message = f"• *{series.name}*{year_str}\n"
-                message += f"  Сейчас: сезон {user_series.current_season}, серия {user_series.current_episode}"
-                
-                # Show the 'Watched' and 'Remove' buttons for each series
-                keyboard = [
-                    [
-                        InlineKeyboardButton(f"✅ Просмотрено", callback_data=f"mark_watched_{series.id}"),
-                        InlineKeyboardButton(f"❌ Удалить", callback_data=f"remove_series_{series.id}")
-                    ]
-                ]
-                reply_markup = InlineKeyboardMarkup(keyboard)
-                
-                if update.callback_query:
-                    context.bot.send_message(
-                        chat_id=chat_id,
-                        text=message,
-                        parse_mode=ParseMode.MARKDOWN,
-                        reply_markup=reply_markup
-                    )
-                else:
-                    update.message.reply_text(message, parse_mode=ParseMode.MARKDOWN, reply_markup=reply_markup)
-                logger.info(f"Sent message for series: {series.name}")
-            except Exception as e:
-                logger.error(f"Error sending message for series {series.name}: {e}")
-        
-        # Send footer with common actions
-        try:
-            keyboard = [
-                [
-                    InlineKeyboardButton("➕ Добавить сериал", callback_data="command_add"),
-                    InlineKeyboardButton("📝 Обновить прогресс", callback_data="command_update")
-                ],
-                [
-                    InlineKeyboardButton("❓ Помощь", callback_data="command_help"),
-                    InlineKeyboardButton("Просмотренные сериалы", callback_data="command_watched")
-                ]
-            ]
-            reply_markup = InlineKeyboardMarkup(keyboard)
-            if update.callback_query:
-                context.bot.send_message(
-                    chat_id=chat_id,
-                    text="*Действия:*",
-                    parse_mode=ParseMode.MARKDOWN,
-                    reply_markup=reply_markup
-                )
-            else:
-                update.message.reply_text(
-                    "*Действия:*",
-                    parse_mode=ParseMode.MARKDOWN,
-                    reply_markup=reply_markup
-                )
-            logger.info("Sent footer message with actions")
-        except Exception as e:
-            logger.error(f"Error sending footer message: {e}")
+        return self.watchlist_handlers.list_series(update, context)
         
     def error_handler(self, update: Update, context: CallbackContext) -> None:
         """Log errors caused by updates."""
@@ -743,7 +630,7 @@ class SeriesTrackerBot:
         
 def main():
     """Start the bot."""
-    bot = SeriesTrackerBot()
+    bot = SeriesTrackerBot(os.getenv('TELEGRAM_BOT_TOKEN'), DBHandler(), TMDBApi())
     # Use webhook in production, polling in development
     use_webhook = os.getenv('ENVIRONMENT', 'development').lower() == 'production'
     bot.start_bot(use_webhook)
