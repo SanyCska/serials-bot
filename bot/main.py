@@ -1,5 +1,6 @@
 import os
 import logging
+
 from telegram import Update, ParseMode, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (
     Updater,
@@ -14,7 +15,6 @@ from dotenv import load_dotenv
 from flask import Flask
 import threading
 
-from bot.database.models import init_db
 from bot.database.db_handler import DBHandler
 from bot.tmdb_api import TMDBApi
 from bot.scheduler import NotificationScheduler
@@ -30,9 +30,6 @@ from bot.conversations import (
     CANCEL_PATTERN,
     SEARCH_WATCHED,
     SERIES_SELECTION,
-    SELECT_SEASON,
-    SELECT_EPISODE,
-    MARK_WATCHED,
     MANUAL_SEASON_ENTRY,
     SERIES_PATTERN,
     SEASON_PATTERN,
@@ -42,6 +39,7 @@ from bot.conversations import (
     MANUAL_ENTRY_PATTERN,
 )
 from bot.watchlist_handlers import WatchlistHandlers
+from bot.watched_handlers import WatchedHandlers
 
 # Load environment variables
 load_dotenv()
@@ -71,6 +69,7 @@ class SeriesTrackerBot:
         self.port = port
         self.conversation_manager = ConversationManager(db, tmdb)
         self.watchlist_handlers = WatchlistHandlers(db, tmdb)
+        self.watched_handlers = WatchedHandlers(db, tmdb)
         
         # Set up the Telegram bot with higher timeout
         request_kwargs = {
@@ -114,7 +113,7 @@ class SeriesTrackerBot:
         self.dispatcher.add_handler(CommandHandler("watchlater", self.conversation_manager.view_watch_later_start))
         self.dispatcher.add_handler(CommandHandler("addinwatchlater", self.conversation_manager.add_to_watch_later_start))
         self.dispatcher.add_handler(CommandHandler("addwatched", self.conversation_manager.add_watched_series_start))
-        self.dispatcher.add_handler(CommandHandler("watched", self.list_watched))
+        self.dispatcher.add_handler(CommandHandler("watched", self.watched_handlers.list_watched))
         self.dispatcher.add_handler(CommandHandler("markwatched", self.conversation_manager.mark_watched_start))
         
         # Add series in watchlist conversation handler
@@ -429,7 +428,7 @@ class SeriesTrackerBot:
         elif command == 'watched':
             logger.info("Showing watched series...")
             query.answer("Showing watched series...")
-            return self.list_watched(update, context)
+            return self.watched_handlers.list_watched(update, context)
         elif command == 'update':
             logger.info("Starting update progress process...")
             query.answer("Starting update progress process...")
@@ -446,30 +445,6 @@ class SeriesTrackerBot:
             logger.warning(f"Unknown command button: {command}")
             query.answer("Unknown command")
             return ConversationHandler.END
-        
-    # def check_updates_callback(self, update: Update, context: CallbackContext) -> None:
-    #     """Check updates from callback query"""
-    #     query = update.callback_query
-    #     logger.info("Processing check updates callback")
-    #     # Run a manual check
-    #     result = self.scheduler.manual_check(query.from_user.id)
-    #     logger.info(f"Manual check result for user {query.from_user.id}: {result}")
-    #     # Add buttons for after check
-    #     keyboard = [
-    #         [
-    #             InlineKeyboardButton("My List", callback_data="command_list"),
-    #             InlineKeyboardButton("Update Progress", callback_data="command_update")
-    #         ],
-    #         [
-    #             InlineKeyboardButton("Add Series", callback_data="command_add"),
-    #             InlineKeyboardButton("Help", callback_data="command_help")
-    #         ]
-    #     ]
-    #     reply_markup = InlineKeyboardMarkup(keyboard)
-    #     try:
-    #         query.edit_message_text(result, reply_markup=reply_markup)
-    #     except Exception as e:
-    #         logger.error(f"Error updating message with check results: {e}")
         
     def move_to_watchlist(self, update: Update, context: CallbackContext) -> None:
         """Move a series from watching to watchlist"""
@@ -528,54 +503,7 @@ class SeriesTrackerBot:
         else:
             logger.error(f"Failed to move series {series_id} to watchlist for user {user.id}")
             query.edit_message_text("Error moving series. Please try again later.")
-        
-    def list_watched(self, update: Update, context: CallbackContext):
-        """List all watched series for a user."""
-        if update.callback_query:
-            query = update.callback_query
-            user = self.db.get_user(query.from_user.id)
-            send = lambda text, **kwargs: query.edit_message_text(text, **kwargs)
-        else:
-            user = self.db.get_user(update.effective_user.id)
-            send = lambda text, **kwargs: update.message.reply_text(text, **kwargs)
 
-        if not user:
-            send("Вы ещё не добавили ни одного сериала. Используйте /addwatched, чтобы добавить первый просмотренный сериал.")
-            return
-
-        series_list = self.db.get_user_series_list(user.id, watched_only=True)
-
-        if not series_list:
-            keyboard = [
-                [InlineKeyboardButton("Добавить просмотренный сериал", callback_data="command_addwatched")],
-                [InlineKeyboardButton("Смотрю сейчас", callback_data="command_list")],
-            ]
-            reply_markup = InlineKeyboardMarkup(keyboard)
-            send(
-                "Вы ещё не отметили ни один сериал как просмотренный.\nИспользуйте /addwatched, чтобы добавить уже просмотренные сериалы.",
-                reply_markup=reply_markup
-            )
-            return
-
-        message = "*Ваши просмотренные сериалы:*\n\n"
-        for user_series, series in series_list:
-            year_str = f" ({series.year})" if series.year else ""
-            watched_date = user_series.watched_date.strftime("%Y-%m-%d") if user_series.watched_date else "Неизвестная дата"
-            message += f"• *{series.name}*{year_str}\n"
-            message += f"  Просмотр завершён: {watched_date}\n\n"
-
-        keyboard = [
-            [InlineKeyboardButton("Добавить просмотренный сериал", callback_data="command_addwatched")],
-            [InlineKeyboardButton("Смотрю сейчас", callback_data="command_list")],
-            [InlineKeyboardButton("Помощь", callback_data="command_help")]
-        ]
-        reply_markup = InlineKeyboardMarkup(keyboard)
-        send(
-            message,
-            parse_mode=ParseMode.MARKDOWN,
-            reply_markup=reply_markup
-        )
-        
     def mark_watched_callback(self, update: Update, context: CallbackContext) -> None:
         """Handle marking a series as watched."""
         query = update.callback_query
