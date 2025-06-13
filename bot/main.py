@@ -25,6 +25,7 @@ from bot.conversations import (
     SERIES_SELECTION,
     SERIES_PATTERN,
 )
+from bot.watch_later_handlers import WatchLaterHandlers
 from bot.watchlist_handlers import WatchlistHandlers
 from bot.watched_handlers import WatchedHandlers
 
@@ -57,6 +58,7 @@ class SeriesTrackerBot:
         self.conversation_manager = ConversationManager(db, tmdb)
         self.watchlist_handlers = WatchlistHandlers(db, tmdb)
         self.watched_handlers = WatchedHandlers(db, tmdb)
+        self.watch_later_handlers = WatchLaterHandlers(db, tmdb)
         
         # Set up the Telegram bot with higher timeout
         request_kwargs = {
@@ -97,8 +99,8 @@ class SeriesTrackerBot:
         self.dispatcher.add_handler(CommandHandler("start", self.start))
         self.dispatcher.add_handler(CommandHandler("help", self.help_command))
         self.dispatcher.add_handler(CommandHandler("watchlist", self.list_series))
-        self.dispatcher.add_handler(CommandHandler("watchlater", self.conversation_manager.view_watch_later_start))
-        self.dispatcher.add_handler(CommandHandler("addinwatchlater", self.conversation_manager.add_to_watch_later_start))
+        self.dispatcher.add_handler(CommandHandler("watchlater", self.watch_later_handlers.view_watch_later_start))
+        self.dispatcher.add_handler(CommandHandler("addinwatchlater", self.watch_later_handlers.add_to_watch_later_start))
         self.dispatcher.add_handler(CommandHandler("addwatched", self.watched_handlers.add_watched_series_start))
         self.dispatcher.add_handler(CommandHandler("watched", self.watched_handlers.list_watched))
         self.dispatcher.add_handler(CommandHandler("markwatched", self.conversation_manager.mark_watched_start))
@@ -120,8 +122,8 @@ class SeriesTrackerBot:
         # Add watch later conversation handler
         add_watchlater_conv = ConversationHandler(
             entry_points=[
-                CommandHandler("addinwatchlater", self.conversation_manager.add_to_watch_later_start),
-                CallbackQueryHandler(self.conversation_manager.add_to_watch_later_start, pattern="^command_addwatch$")
+                CommandHandler("addinwatchlater", self.watch_later_handlers.add_to_watch_later_start),
+                CallbackQueryHandler(self.watch_later_handlers.add_to_watch_later_start, pattern="^command_addwatch$")
             ],
             states={
                 SELECTING_SERIES: [
@@ -300,9 +302,9 @@ class SeriesTrackerBot:
         # Close database connections
         self.db.close()
         
-    def view_watchlist(self, update: Update, context: CallbackContext) -> None:
+    def view_watch_later_list(self, update: Update, context: CallbackContext) -> None:
         """View the user's watchlist"""
-        self.conversation_manager.view_watch_later_start(update, context)
+        self.watch_later_handlers.view_watch_later_start(update, context)
         
     def handle_command_button(self, update: Update, context: CallbackContext) -> None:
         """Handle command buttons."""
@@ -321,7 +323,7 @@ class SeriesTrackerBot:
         elif command == 'watchlist':
             logger.info("Showing watchlist...")
             query.answer("Showing watchlist...")
-            return self.conversation_manager.view_watch_later_start(update, context)
+            return self.watch_later_handlers.view_watch_later_start(update, context)
         elif command == 'watched':
             logger.info("Showing watched series...")
             query.answer("Showing watched series...")
