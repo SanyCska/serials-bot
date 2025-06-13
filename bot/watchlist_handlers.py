@@ -589,6 +589,39 @@ class WatchlistHandlers:
 
         return MANUAL_EPISODE_ENTRY
 
+    def mark_watched_callback(self, update: Update, context: CallbackContext) -> None:
+        """Handle marking a series as watched."""
+        query = update.callback_query
+        query.answer()
+
+        try:
+            series_id = int(query.data.split('_')[2])
+            user = self.db.get_user(query.from_user.id)
+
+            if not user:
+                query.edit_message_text("Ошибка: пользователь не найден.")
+                return
+
+            # Get series name before marking as watched
+            user_series_list = self.db.get_user_series_list(user.id)
+            series_name = None
+            for user_series, s in user_series_list:
+                if s.id == series_id:
+                    series_name = s.name
+                    break
+
+            # Mark the series as watched
+            if self.db.mark_as_watched(user.id, series_id):
+                message = f"✅ Я отметил '{series_name}' как просмотренный и переместил его в ваш список просмотренных!"
+
+                query.edit_message_text(message)
+            else:
+                query.edit_message_text("Ошибка при отметке сериала как просмотренного. Пожалуйста, попробуйте позже.")
+        except Exception as e:
+            logger.error(f"Error marking series as watched: {e}", exc_info=True)
+            query.edit_message_text(
+                "Произошла ошибка при отметке сериала как просмотренного. Пожалуйста, попробуйте ещё раз.")
+
     def get_add_series_conversation_handler(self, conversation_manager):
         """Create and return the add series ConversationHandler"""
         return ConversationHandler(

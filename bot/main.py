@@ -146,7 +146,7 @@ class SeriesTrackerBot:
         self.dispatcher.add_handler(CallbackQueryHandler(self.conversation_manager.handle_watchlist_actions, pattern="^(move_watching_|watchlist_series_)"))
         
         # Mark watched handlers
-        self.dispatcher.add_handler(CallbackQueryHandler(self.mark_watched_callback, pattern="^mark_watched_"))
+        self.dispatcher.add_handler(CallbackQueryHandler(self.watchlist_handlers.mark_watched_callback, pattern="^mark_watched_"))
         
         # Remove series handlers
         self.dispatcher.add_handler(CallbackQueryHandler(self.remove_series_callback, pattern="^remove_series_"))
@@ -309,7 +309,7 @@ class SeriesTrackerBot:
         query = update.callback_query
         command = query.data.split('_')[1]
         logger.info(f"Command button pressed: {command}")
-        
+
         if command == 'add':
             logger.info("Starting add series process...")
             query.answer("Starting add series process...")
@@ -400,38 +400,6 @@ class SeriesTrackerBot:
         else:
             logger.error(f"Failed to move series {series_id} to watchlist for user {user.id}")
             query.edit_message_text("Error moving series. Please try again later.")
-
-    def mark_watched_callback(self, update: Update, context: CallbackContext) -> None:
-        """Handle marking a series as watched."""
-        query = update.callback_query
-        query.answer()
-        
-        try:
-            series_id = int(query.data.split('_')[2])
-            user = self.db.get_user(query.from_user.id)
-            
-            if not user:
-                query.edit_message_text("Ошибка: пользователь не найден.")
-                return
-            
-            # Get series name before marking as watched
-            user_series_list = self.db.get_user_series_list(user.id)
-            series_name = None
-            for user_series, s in user_series_list:
-                if s.id == series_id:
-                    series_name = s.name
-                    break
-            
-            # Mark the series as watched
-            if self.db.mark_as_watched(user.id, series_id):
-                message = f"✅ Я отметил '{series_name}' как просмотренный и переместил его в ваш список просмотренных!"
-                
-                query.edit_message_text(message)
-            else:
-                query.edit_message_text("Ошибка при отметке сериала как просмотренного. Пожалуйста, попробуйте позже.")
-        except Exception as e:
-            logger.error(f"Error marking series as watched: {e}", exc_info=True)
-            query.edit_message_text("Произошла ошибка при отметке сериала как просмотренного. Пожалуйста, попробуйте ещё раз.")
         
     def remove_series_callback(self, update: Update, context: CallbackContext) -> None:
         """Handle removing a series from the user's watching list."""
