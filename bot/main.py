@@ -100,7 +100,7 @@ class SeriesTrackerBot:
         self.dispatcher.add_handler(CommandHandler("help", self.help_command))
         self.dispatcher.add_handler(CommandHandler("watchlist", self.list_series))
         self.dispatcher.add_handler(CommandHandler("watchlater", self.watch_later_handlers.view_watch_later_start))
-        self.dispatcher.add_handler(CommandHandler("addinwatchlater", self.watch_later_handlers.add_to_watch_later_start))
+        # Note: addinwatchlater is handled by the ConversationHandler below
         self.dispatcher.add_handler(CommandHandler("addwatched", self.watched_handlers.add_watched_series_start))
         self.dispatcher.add_handler(CommandHandler("watched", self.watched_handlers.list_watched))
         self.dispatcher.add_handler(CommandHandler("markwatched", self.conversation_manager.mark_watched_start))
@@ -344,64 +344,6 @@ class SeriesTrackerBot:
             logger.warning(f"Unknown command button: {command}")
             query.answer("Unknown command")
             return ConversationHandler.END
-        
-    def move_to_watchlist(self, update: Update, context: CallbackContext) -> None:
-        """Move a series from watching to watchlist"""
-        query = update.callback_query
-        logger.info(f"Processing move to watchlist callback: {query.data}")
-        query.answer()
-        
-        # Extract series ID from callback data
-        try:
-            series_id = int(query.data.split("_")[2])
-            logger.info(f"Moving series ID {series_id} to watchlist")
-        except (IndexError, ValueError) as e:
-            logger.error(f"Error parsing series ID from callback data: {query.data}, error: {e}")
-            query.edit_message_text("Error processing your request. Please try again.")
-            return
-        
-        # Get user
-        user = self.db.get_user(query.from_user.id)
-        
-        if not user:
-            logger.error(f"User not found for telegram_id: {query.from_user.id}")
-            query.edit_message_text("Error: User not found.")
-            return
-            
-        # Get series name first for the success message
-        series = None
-        user_series_list = self.db.get_user_series_list(user.id)
-        for user_series, s in user_series_list:
-            if s.id == series_id:
-                series = s
-                break
-                
-        # Move the series to watchlist
-        if self.db.move_to_watchlist(user.id, series_id):
-            logger.info(f"Successfully moved series {series_id} to watchlist for user {user.id}")
-            if series:
-                # Create buttons for next actions
-                keyboard = [
-                    [
-                        InlineKeyboardButton("Watch later", callback_data="command_watchlist"),
-                        InlineKeyboardButton("My Series", callback_data="command_list")
-                    ],
-                    [
-                        InlineKeyboardButton("Add More Series", callback_data="command_add"),
-                        InlineKeyboardButton("Help", callback_data="command_help")
-                    ]
-                ]
-                reply_markup = InlineKeyboardMarkup(keyboard)
-                
-                query.edit_message_text(
-                    f"I've moved '{series.name}' to your watchlist for future viewing!",
-                    reply_markup=reply_markup
-                )
-            else:
-                query.edit_message_text("Series has been moved to your watchlist.")
-        else:
-            logger.error(f"Failed to move series {series_id} to watchlist for user {user.id}")
-            query.edit_message_text("Error moving series. Please try again later.")
         
     def remove_series_callback(self, update: Update, context: CallbackContext) -> None:
         """Handle removing a series from the user's watching list."""
