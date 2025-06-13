@@ -21,22 +21,9 @@ from bot.scheduler import NotificationScheduler
 from bot.conversations import (
     ConversationManager,
     SELECTING_SERIES,
-    SELECTING_SEASON,
-    SELECTING_EPISODE,
-    MANUAL_EPISODE_ENTRY,
-    MANUAL_SERIES_NAME,
-    MANUAL_SERIES_YEAR,
-    MANUAL_SERIES_SEASONS,
     CANCEL_PATTERN,
-    SEARCH_WATCHED,
     SERIES_SELECTION,
-    MANUAL_SEASON_ENTRY,
     SERIES_PATTERN,
-    SEASON_PATTERN,
-    EPISODE_PATTERN,
-    MANUAL_ADD_PATTERN,
-    MANUAL_SEASON_PATTERN,
-    MANUAL_ENTRY_PATTERN,
 )
 from bot.watchlist_handlers import WatchlistHandlers
 from bot.watched_handlers import WatchedHandlers
@@ -117,107 +104,17 @@ class SeriesTrackerBot:
         self.dispatcher.add_handler(CommandHandler("markwatched", self.conversation_manager.mark_watched_start))
         
         # Add series in watchlist conversation handler
-        add_series_conv = ConversationHandler(
-            entry_points=[
-                CommandHandler("add", self.watchlist_handlers.add_series_start),
-                CommandHandler("addinwatchlist", self.watchlist_handlers.add_series_start),
-                CallbackQueryHandler(self.watchlist_handlers.add_series_start, pattern="^command_add$")
-            ],
-            states={
-                SELECTING_SERIES: [
-                    MessageHandler(Filters.text & ~Filters.command, self.conversation_manager.search_series),
-                    CallbackQueryHandler(self.watchlist_handlers.series_selected, pattern=f"^{SERIES_PATTERN.format('.*')}$"),
-                    CallbackQueryHandler(self.watchlist_handlers.manual_series_name_prompt, pattern=f"^{MANUAL_ADD_PATTERN}$"),
-                    CallbackQueryHandler(self.conversation_manager.cancel, pattern=f"^{CANCEL_PATTERN}$")
-                ],
-                MANUAL_SERIES_NAME: [
-                    MessageHandler(Filters.text & ~Filters.command, self.watchlist_handlers.manual_series_name_entered),
-                    CommandHandler("cancel", self.conversation_manager.cancel)
-                ],
-                MANUAL_SERIES_YEAR: [
-                    MessageHandler(Filters.text & ~Filters.command, self.watchlist_handlers.manual_series_year_entered),
-                    CommandHandler("cancel", self.conversation_manager.cancel)
-                ],
-                MANUAL_SERIES_SEASONS: [
-                    MessageHandler(Filters.text & ~Filters.command, self.watchlist_handlers.manual_series_seasons_entered),
-                    CommandHandler("cancel", self.conversation_manager.cancel)
-                ],
-                SELECTING_SEASON: [
-                    CallbackQueryHandler(self.watchlist_handlers.season_selected, pattern=f"^{SEASON_PATTERN.format('.*', '.*')}$"),
-                    CallbackQueryHandler(self.watchlist_handlers.manual_season_entry, pattern=f"^{MANUAL_SEASON_PATTERN.format('.*')}$"),
-                    CallbackQueryHandler(self.conversation_manager.cancel, pattern=f"^{CANCEL_PATTERN}$")
-                ],
-                MANUAL_SEASON_ENTRY: [
-                    MessageHandler(Filters.text & ~Filters.command, self.watchlist_handlers.manual_season_entry),
-                    CommandHandler("cancel", self.conversation_manager.cancel)
-                ],
-                SELECTING_EPISODE: [
-                    CallbackQueryHandler(self.watchlist_handlers.episode_selected, pattern=f"^{EPISODE_PATTERN.format('.*', '.*', '.*')}$"),
-                    CallbackQueryHandler(self.watchlist_handlers.manual_episode_entry, pattern=f"^{MANUAL_ENTRY_PATTERN.format('.*', '.*')}$"),
-                    CallbackQueryHandler(self.conversation_manager.cancel, pattern=f"^{CANCEL_PATTERN}$")
-                ],
-                MANUAL_EPISODE_ENTRY: [
-                    MessageHandler(Filters.text & ~Filters.command, self.watchlist_handlers.manual_episode_entry),
-                    CommandHandler("cancel", self.conversation_manager.cancel)
-                ]
-            },
-            fallbacks=[CommandHandler("cancel", self.conversation_manager.cancel)]
-        )
+        add_series_conv = self.watchlist_handlers.get_add_series_conversation_handler(self.conversation_manager)
         
         # Add the conversation handler to dispatcher
         self.dispatcher.add_handler(add_series_conv)
         
         # Update progress conversation handler
-        update_progress_conv = ConversationHandler(
-            entry_points=[
-                CallbackQueryHandler(self.conversation_manager.update_progress_start, pattern="^command_update$")
-            ],
-            states={
-                SELECTING_SERIES: [
-                    CallbackQueryHandler(self.conversation_manager.update_progress_series_selected, pattern="^update_series_.*$"),
-                    CallbackQueryHandler(self.conversation_manager.cancel, pattern=f"^{CANCEL_PATTERN}$")
-                ],
-                SELECTING_SEASON: [
-                    CallbackQueryHandler(self.watchlist_handlers.season_selected, pattern=f"^{SEASON_PATTERN.format('.*', '.*')}$"),
-                    CallbackQueryHandler(self.watchlist_handlers.manual_season_entry, pattern=f"^{MANUAL_SEASON_PATTERN.format('.*')}$"),
-                    CallbackQueryHandler(self.conversation_manager.cancel, pattern=f"^{CANCEL_PATTERN}$")
-                ],
-                MANUAL_SEASON_ENTRY: [
-                    MessageHandler(Filters.text & ~Filters.command, self.watchlist_handlers.manual_season_entry),
-                    CommandHandler("cancel", self.conversation_manager.cancel)
-                ],
-                SELECTING_EPISODE: [
-                    CallbackQueryHandler(self.watchlist_handlers.episode_selected, pattern=f"^{EPISODE_PATTERN.format('.*', '.*', '.*')}$"),
-                    CallbackQueryHandler(self.watchlist_handlers.manual_episode_entry, pattern=f"^{MANUAL_ENTRY_PATTERN.format('.*', '.*')}$"),
-                    CallbackQueryHandler(self.conversation_manager.cancel, pattern=f"^{CANCEL_PATTERN}$")
-                ],
-                MANUAL_EPISODE_ENTRY: [
-                    MessageHandler(Filters.text & ~Filters.command, self.watchlist_handlers.manual_episode_entry),
-                    CommandHandler("cancel", self.conversation_manager.cancel)
-                ]
-            },
-            fallbacks=[CommandHandler("cancel", self.conversation_manager.cancel)]
-        )
+        update_progress_conv = self.watchlist_handlers.get_update_progress_conversation_handler(self.conversation_manager)
         self.dispatcher.add_handler(update_progress_conv)
         
         # Add watched series conversation handler (must be before generic handlers)
-        add_watched_conv = ConversationHandler(
-            entry_points=[
-                CommandHandler("addwatched", self.watched_handlers.add_watched_series_start),
-                CallbackQueryHandler(self.watched_handlers.add_watched_series_start, pattern="^command_addwatched$")
-            ],
-            states={
-                SEARCH_WATCHED: [
-                    MessageHandler(Filters.text & ~Filters.command, self.watched_handlers.search_watched_series),
-                    CommandHandler("cancel", self.conversation_manager.cancel)
-                ],
-                SELECTING_SERIES: [
-                    CallbackQueryHandler(self.watched_handlers.watched_series_selected, pattern=f"^{SERIES_PATTERN.format('.*')}$"),
-                    CallbackQueryHandler(self.conversation_manager.cancel, pattern=f"^{CANCEL_PATTERN}$")
-                ]
-            },
-            fallbacks=[CommandHandler("cancel", self.conversation_manager.cancel)]
-        )
+        add_watched_conv = self.watched_handlers.get_add_watched_conversation_handler(self.conversation_manager)
         self.dispatcher.add_handler(add_watched_conv)
         
         # Add watch later conversation handler

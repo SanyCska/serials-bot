@@ -1,8 +1,13 @@
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update, ParseMode
-from telegram.ext import CallbackContext, ConversationHandler, MessageHandler, Filters
+from telegram.ext import CallbackContext, MessageHandler, Filters, CommandHandler, ConversationHandler, CallbackQueryHandler
 import logging
-from .conversations import ConversationManager
-
+from bot.conversations import (
+    ConversationManager,
+    SELECTING_SERIES,
+    CANCEL_PATTERN,
+    SEARCH_WATCHED,
+    SERIES_PATTERN
+)
 # Conversation states
 SELECTING_SERIES, SELECTING_SEASON, SELECTING_EPISODE, MANUAL_EPISODE_ENTRY, MANUAL_SERIES_NAME, MANUAL_SERIES_YEAR, MANUAL_SERIES_SEASONS, SEARCH_WATCHED, SERIES_SELECTION, SELECT_SEASON, SELECT_EPISODE, MARK_WATCHED, MANUAL_SEASON_ENTRY = range(13)
 
@@ -133,3 +138,22 @@ class WatchedHandlers:
             f'"{local_series.name}" добавлен в список просмотренных сериалов'
         )
         return ConversationHandler.END
+
+    def get_add_watched_conversation_handler(self, conversation_manager):
+        return ConversationHandler(
+            entry_points=[
+                CommandHandler("addwatched", self.add_watched_series_start),
+                CallbackQueryHandler(self.add_watched_series_start, pattern="^command_addwatched$")
+            ],
+            states={
+                SEARCH_WATCHED: [
+                    MessageHandler(Filters.text & ~Filters.command, self.search_watched_series),
+                    CommandHandler("cancel", conversation_manager.cancel)
+                ],
+                SELECTING_SERIES: [
+                    CallbackQueryHandler(self.watched_series_selected, pattern=f"^{SERIES_PATTERN.format('.*')}$"),
+                    CallbackQueryHandler(conversation_manager.cancel, pattern=f"^{CANCEL_PATTERN}$")
+                ]
+            },
+            fallbacks=[CommandHandler("cancel", conversation_manager.cancel)]
+        )

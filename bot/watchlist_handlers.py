@@ -1,5 +1,5 @@
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update, ParseMode
-from telegram.ext import CallbackContext, ConversationHandler, MessageHandler, Filters
+from telegram.ext import CallbackContext, ConversationHandler, MessageHandler, Filters, CommandHandler, CallbackQueryHandler
 import logging
 
 # Configure logging
@@ -138,7 +138,7 @@ class WatchlistHandlers:
                 logger.error(f"Failed to retrieve manual series details for ID: {series_id}")
                 context.bot.send_message(
                     chat_id=query.message.chat_id,
-                    text="Error retrieving series details. Please try again later."
+                    text="Ошибка получения данных о сериале. Пожалуйста, попробуйте позже"
                 )
                 return ConversationHandler.END
             # Use total_seasons from local DB
@@ -588,3 +588,84 @@ class WatchlistHandlers:
                 return MANUAL_EPISODE_ENTRY
 
         return MANUAL_EPISODE_ENTRY
+
+    def get_add_series_conversation_handler(self, conversation_manager):
+        """Create and return the add series ConversationHandler"""
+        return ConversationHandler(
+            entry_points=[
+                CommandHandler("add", self.add_series_start),
+                CommandHandler("addinwatchlist", self.add_series_start),
+                CallbackQueryHandler(self.add_series_start, pattern="^command_add$")
+            ],
+            states={
+                SELECTING_SERIES: [
+                    MessageHandler(Filters.text & ~Filters.command, conversation_manager.search_series),
+                    CallbackQueryHandler(self.series_selected, pattern=f"^{SERIES_PATTERN.format('.*')}$"),
+                    CallbackQueryHandler(self.manual_series_name_prompt, pattern=f"^{MANUAL_ADD_PATTERN}$"),
+                    CallbackQueryHandler(conversation_manager.cancel, pattern=f"^{CANCEL_PATTERN}$")
+                ],
+                MANUAL_SERIES_NAME: [
+                    MessageHandler(Filters.text & ~Filters.command, self.manual_series_name_entered),
+                    CommandHandler("cancel", conversation_manager.cancel)
+                ],
+                MANUAL_SERIES_YEAR: [
+                    MessageHandler(Filters.text & ~Filters.command, self.manual_series_year_entered),
+                    CommandHandler("cancel", conversation_manager.cancel)
+                ],
+                MANUAL_SERIES_SEASONS: [
+                    MessageHandler(Filters.text & ~Filters.command, self.manual_series_seasons_entered),
+                    CommandHandler("cancel", conversation_manager.cancel)
+                ],
+                SELECTING_SEASON: [
+                    CallbackQueryHandler(self.season_selected, pattern=f"^{SEASON_PATTERN.format('.*', '.*')}$"),
+                    CallbackQueryHandler(self.manual_season_entry, pattern=f"^{MANUAL_SEASON_PATTERN.format('.*')}$"),
+                    CallbackQueryHandler(conversation_manager.cancel, pattern=f"^{CANCEL_PATTERN}$")
+                ],
+                MANUAL_SEASON_ENTRY: [
+                    MessageHandler(Filters.text & ~Filters.command, self.manual_season_entry),
+                    CommandHandler("cancel", conversation_manager.cancel)
+                ],
+                SELECTING_EPISODE: [
+                    CallbackQueryHandler(self.episode_selected, pattern=f"^{EPISODE_PATTERN.format('.*', '.*', '.*')}$"),
+                    CallbackQueryHandler(self.manual_episode_entry, pattern=f"^{MANUAL_ENTRY_PATTERN.format('.*', '.*')}$"),
+                    CallbackQueryHandler(conversation_manager.cancel, pattern=f"^{CANCEL_PATTERN}$")
+                ],
+                MANUAL_EPISODE_ENTRY: [
+                    MessageHandler(Filters.text & ~Filters.command, self.manual_episode_entry),
+                    CommandHandler("cancel", conversation_manager.cancel)
+                ]
+            },
+            fallbacks=[CommandHandler("cancel", conversation_manager.cancel)]
+        )
+
+    def get_update_progress_conversation_handler(self, conversation_manager):
+        return ConversationHandler(
+            entry_points=[
+                CallbackQueryHandler(conversation_manager.update_progress_start, pattern="^command_update$")
+            ],
+            states={
+                SELECTING_SERIES: [
+                    CallbackQueryHandler(conversation_manager.update_progress_series_selected, pattern="^update_series_.*$"),
+                    CallbackQueryHandler(conversation_manager.cancel, pattern=f"^{CANCEL_PATTERN}$")
+                ],
+                SELECTING_SEASON: [
+                    CallbackQueryHandler(self.season_selected, pattern=f"^{SEASON_PATTERN.format('.*', '.*')}$"),
+                    CallbackQueryHandler(self.manual_season_entry, pattern=f"^{MANUAL_SEASON_PATTERN.format('.*')}$"),
+                    CallbackQueryHandler(conversation_manager.cancel, pattern=f"^{CANCEL_PATTERN}$")
+                ],
+                MANUAL_SEASON_ENTRY: [
+                    MessageHandler(Filters.text & ~Filters.command, self.manual_season_entry),
+                    CommandHandler("cancel", conversation_manager.cancel)
+                ],
+                SELECTING_EPISODE: [
+                    CallbackQueryHandler(self.episode_selected, pattern=f"^{EPISODE_PATTERN.format('.*', '.*', '.*')}$"),
+                    CallbackQueryHandler(self.manual_episode_entry, pattern=f"^{MANUAL_ENTRY_PATTERN.format('.*', '.*')}$"),
+                    CallbackQueryHandler(conversation_manager.cancel, pattern=f"^{CANCEL_PATTERN}$")
+                ],
+                MANUAL_EPISODE_ENTRY: [
+                    MessageHandler(Filters.text & ~Filters.command, self.manual_episode_entry),
+                    CommandHandler("cancel", conversation_manager.cancel)
+                ]
+            },
+            fallbacks=[CommandHandler("cancel", conversation_manager.cancel)]
+        )

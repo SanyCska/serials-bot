@@ -488,7 +488,7 @@ class ConversationManager:
         else:
             local_series = self.db.get_series_by_id(series_id)
             if not local_series:
-                query.edit_message_text("Error retrieving series details. Please try again later.")
+                query.edit_message_text("Ошибка получения данных о сериале. Пожалуйста, попробуйте позже")
                 return ConversationHandler.END
             total_seasons = getattr(local_series, 'total_seasons', 1)
             for season_num in range(1, total_seasons + 1):
