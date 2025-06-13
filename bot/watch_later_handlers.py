@@ -2,6 +2,13 @@ from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update, ParseMo
 from telegram.ext import CallbackContext, ConversationHandler, MessageHandler, Filters, CommandHandler, CallbackQueryHandler
 import logging
 
+from bot.conversations import (
+    SELECTING_SERIES,
+    CANCEL_PATTERN,
+    SERIES_SELECTION,
+    SERIES_PATTERN,
+)
+
 # Conversation states
 SELECTING_SERIES, SELECTING_SEASON, SELECTING_EPISODE, MANUAL_EPISODE_ENTRY, MANUAL_SERIES_NAME, MANUAL_SERIES_YEAR, MANUAL_SERIES_SEASONS, SEARCH_WATCHED, SERIES_SELECTION, SELECT_SEASON, SELECT_EPISODE, MARK_WATCHED, MANUAL_SEASON_ENTRY = range(13)
 
@@ -270,3 +277,24 @@ class WatchLaterHandlers:
                 query.edit_message_text("Произошла ошибка при удалении сериала. Попробуйте еще раз.")
 
             return ConversationHandler.END
+
+    def get_add_watch_later_conversation_handler(self, conversation_manager):
+        return ConversationHandler(
+            entry_points=[
+                CommandHandler("addinwatchlater", self.add_to_watch_later_start),
+                CallbackQueryHandler(self.add_to_watch_later_start, pattern="^command_addwatch$")
+            ],
+            states={
+                SELECTING_SERIES: [
+                    MessageHandler(Filters.text & ~Filters.command, conversation_manager.search_series),
+                    CallbackQueryHandler(self.watchlater_series_selected, pattern=f"^{SERIES_PATTERN.format('.*')}$"),
+                    CallbackQueryHandler(conversation_manager.cancel, pattern=f"^{CANCEL_PATTERN}$"),
+                    CommandHandler("cancel", conversation_manager.cancel)
+                ],
+                SERIES_SELECTION: [
+                    CallbackQueryHandler(self.watchlater_series_selected, pattern=f"^{SERIES_PATTERN.format('.*')}$"),
+                    CallbackQueryHandler(conversation_manager.cancel, pattern=f"^{CANCEL_PATTERN}$")
+                ]
+            },
+            fallbacks=[CommandHandler("cancel", conversation_manager.cancel)]
+        )

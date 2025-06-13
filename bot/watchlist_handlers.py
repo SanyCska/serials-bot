@@ -644,6 +644,93 @@ class WatchlistHandlers:
             logger.error(f"Error removing series: {e}", exc_info=True)
             query.edit_message_text("Произошла ошибка при удалении сериала. Пожалуйста, попробуйте ещё раз.")
 
+    def update_progress_start(self, update: Update, context: CallbackContext) -> int:
+        """Start the update progress flow: show user's watching series as inline buttons."""
+        user_id = update.effective_user.id if update.effective_user else update.callback_query.from_user.id
+        user = self.db.get_user(user_id)
+        if not user:
+            if update.callback_query:
+                update.callback_query.answer()
+                update.callback_query.edit_message_text("Сначала вам нужно добавить сериал. Используйте команду /add.")
+            else:
+                update.message.reply_text("Сначала вам нужно добавить сериал. Используйте команду /add.")
+            return ConversationHandler.END
+        user_series_list = self.db.get_user_series_list(user.id)
+        if not user_series_list:
+            if update.callback_query:
+                update.callback_query.answer()
+                update.callback_query.edit_message_text("Вы еще не смотрите никаких сериалов. Используйте команду /add.")
+            else:
+                update.message.reply_text("Вы еще не смотрите никаких сериалов. Используйте команду /add.")
+            return ConversationHandler.END
+        keyboard = []
+        for user_series, series in user_series_list:
+            year_str = f" ({series.year})" if series.year else ""
+            keyboard.append([
+                InlineKeyboardButton(
+                    f"{series.name}{year_str}",
+                    callback_data=f"update_series_{series.id}"
+                )
+            ])
+        keyboard.append([InlineKeyboardButton("Отмена", callback_data=CANCEL_PATTERN)])
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        if update.callback_query:
+            update.callback_query.edit_message_text(
+                "Выберите сериал для обновления прогресса:",
+                reply_markup=reply_markup
+            )
+        else:
+            update.message.reply_text(
+                "Выберите сериал для обновления прогресса:",
+                reply_markup=reply_markup
+            )
+        return SELECTING_SERIES
+
+    def update_progress_series_selected(self, update: Update, context: CallbackContext) -> int:
+        """Handle series selection for update progress flow, then prompt for season selection."""
+        query = update.callback_query
+        query.answer()
+        try:
+            series_id = int(query.data.split("_")[2])
+            logger.info(f"Update progress: selected series ID: {series_id}")
+        except (IndexError, ValueError) as e:
+            logger.error(f"Error parsing series ID from update progress callback: {query.data}, error: {e}")
+            query.edit_message_text("Ошибка при обработке вашего выбора. Попробуйте еще раз.")
+            return ConversationHandler.END
+        # Reuse the season selection logic from series_selected
+        series_details = self.tmdb.get_series_details(series_id)
+        keyboard = []
+        if series_details and 'seasons' in series_details and series_details['seasons']:
+            for season in series_details['seasons']:
+                keyboard.append([
+                    InlineKeyboardButton(
+                        f"Сезон {season['season_number']}",
+                        callback_data=SEASON_PATTERN.format(series_id, season['season_number'])
+                    )
+                ])
+        else:
+            local_series = self.db.get_series_by_id(series_id)
+            if not local_series:
+                query.edit_message_text("Ошибка получения данных о сериале. Пожалуйста, попробуйте позже")
+                return ConversationHandler.END
+            total_seasons = getattr(local_series, 'total_seasons', 1)
+            for season_num in range(1, total_seasons + 1):
+                keyboard.append([
+                    InlineKeyboardButton(
+                        f"Сезон {season_num}",
+                        callback_data=SEASON_PATTERN.format(series_id, season_num)
+                    )
+                ])
+        keyboard.append([InlineKeyboardButton("Ввести номер сезона вручную", callback_data=MANUAL_SEASON_PATTERN.format(series_id))])
+        keyboard.append([InlineKeyboardButton("Отмена", callback_data=CANCEL_PATTERN)])
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        query.edit_message_text(
+            "Какой сезон вы сейчас смотрите?",
+            reply_markup=reply_markup
+        )
+        context.user_data["selected_series_id"] = series_id
+        return SELECTING_SEASON
+
     def get_add_series_conversation_handler(self, conversation_manager):
         """Create and return the add series ConversationHandler"""
         return ConversationHandler(
@@ -696,11 +783,11 @@ class WatchlistHandlers:
     def get_update_progress_conversation_handler(self, conversation_manager):
         return ConversationHandler(
             entry_points=[
-                CallbackQueryHandler(conversation_manager.update_progress_start, pattern="^command_update$")
+                CallbackQueryHandler(self.update_progress_start, pattern="^command_update$")
             ],
             states={
                 SELECTING_SERIES: [
-                    CallbackQueryHandler(conversation_manager.update_progress_series_selected, pattern="^update_series_.*$"),
+                    CallbackQueryHandler(self.update_progress_series_selected, pattern="^update_series_.*$"),
                     CallbackQueryHandler(conversation_manager.cancel, pattern=f"^{CANCEL_PATTERN}$")
                 ],
                 SELECTING_SEASON: [

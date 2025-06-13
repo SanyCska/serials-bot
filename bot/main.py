@@ -20,10 +20,6 @@ from bot.tmdb_api import TMDBApi
 from bot.scheduler import NotificationScheduler
 from bot.conversations import (
     ConversationManager,
-    SELECTING_SERIES,
-    CANCEL_PATTERN,
-    SERIES_SELECTION,
-    SERIES_PATTERN,
 )
 from bot.watch_later_handlers import WatchLaterHandlers
 from bot.watchlist_handlers import WatchlistHandlers
@@ -119,26 +115,8 @@ class SeriesTrackerBot:
         self.dispatcher.add_handler(add_watched_conv)
         
         # Add watch later conversation handler
-        add_watchlater_conv = ConversationHandler(
-            entry_points=[
-                CommandHandler("addinwatchlater", self.watch_later_handlers.add_to_watch_later_start),
-                CallbackQueryHandler(self.watch_later_handlers.add_to_watch_later_start, pattern="^command_addwatch$")
-            ],
-            states={
-                SELECTING_SERIES: [
-                    MessageHandler(Filters.text & ~Filters.command, self.conversation_manager.search_series),
-                    CallbackQueryHandler(self.watch_later_handlers.watchlater_series_selected, pattern=f"^{SERIES_PATTERN.format('.*')}$"),
-                    CallbackQueryHandler(self.conversation_manager.cancel, pattern=f"^{CANCEL_PATTERN}$"),
-                    CommandHandler("cancel", self.conversation_manager.cancel)
-                ],
-                SERIES_SELECTION: [
-                    CallbackQueryHandler(self.watch_later_handlers.watchlater_series_selected, pattern=f"^{SERIES_PATTERN.format('.*')}$"),
-                    CallbackQueryHandler(self.conversation_manager.cancel, pattern=f"^{CANCEL_PATTERN}$")
-                ]
-            },
-            fallbacks=[CommandHandler("cancel", self.conversation_manager.cancel)]
-        )
-        self.dispatcher.add_handler(add_watchlater_conv)
+        add_watch_later_conv = self.watch_later_handlers.get_add_watch_later_conversation_handler(self.conversation_manager)
+        self.dispatcher.add_handler(add_watch_later_conv)
         
         # Command button handlers
         self.dispatcher.add_handler(CallbackQueryHandler(self.handle_command_button, pattern="^command_"))
@@ -330,7 +308,7 @@ class SeriesTrackerBot:
         elif command == 'update':
             logger.info("Starting update progress process...")
             query.answer("Starting update progress process...")
-            return self.conversation_manager.update_progress_start(update, context)
+            return self.watchlist_handlers.update_progress_start(update, context)
         elif command == 'help':
             logger.info("Showing help...")
             query.answer("Showing help...")
