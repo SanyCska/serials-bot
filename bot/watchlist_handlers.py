@@ -334,7 +334,9 @@ class WatchlistHandlers:
                 # Show the 'Watched' and 'Remove' buttons for each series
                 keyboard = [
                     [
-                        InlineKeyboardButton(f"✅ Просмотрено", callback_data=f"mark_watched_{series.id}"),
+                        InlineKeyboardButton(f"✅ Просмотрено", callback_data=f"mark_watched_{series.id}")
+                    ],
+                    [
                         InlineKeyboardButton(f"❌ Удалить", callback_data=f"remove_series_{series.id}")
                     ]
                 ]

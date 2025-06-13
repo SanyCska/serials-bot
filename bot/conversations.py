@@ -205,56 +205,6 @@ class ConversationManager:
                 
             return ConversationHandler.END
 
-    def mark_watched_start(self, update: Update, context: CallbackContext) -> int:
-        """Start the process of marking a series as watched."""
-        user_id = update.effective_user.id
-        series_list = self.db.get_user_series_list(user_id)
-        
-        if not series_list:
-            update.message.reply_text("У вас нет сериалов в списке.")
-            return ConversationHandler.END
-        
-        keyboard = []
-        for series in series_list:
-            if not series.is_watched:  # Only show unwatched series
-                keyboard.append([InlineKeyboardButton(
-                    series.title,
-                    callback_data=f"watched_{series.series_id}"
-                )])
-        
-        if not keyboard:
-            update.message.reply_text("У вас нет непросмотренных сериалов.")
-            return ConversationHandler.END
-        
-        keyboard.append([InlineKeyboardButton("Отмена", callback_data="cancel")])
-        reply_markup = InlineKeyboardMarkup(keyboard)
-        
-        update.message.reply_text(
-            "Выберите сериал, чтобы отметить как просмотренный:",
-            reply_markup=reply_markup
-        )
-        return self.MARK_WATCHED
-
-    def mark_watched_selected(self, update: Update, context: CallbackContext) -> int:
-        """Handle the selection of a series to mark as watched."""
-        query = update.callback_query
-        query.answer()
-        
-        if query.data == "cancel":
-            query.edit_message_text("Операция отменена.")
-            return ConversationHandler.END
-        
-        series_id = int(query.data.split("_")[1])
-        user_id = update.effective_user.id
-        
-        if self.db.mark_as_watched(user_id, series_id):
-            series = self.db.get_series(series_id)
-            query.edit_message_text(f"✅ Отметил '{series.title}' как просмотренный!")
-        else:
-            query.edit_message_text("❌ Не удалось отметить сериал как просмотренный.")
-        
-        return ConversationHandler.END
-
     def update_progress_start(self, update: Update, context: CallbackContext) -> int:
         """Start the update progress flow: show user's watching series as inline buttons."""
         user_id = update.effective_user.id if update.effective_user else update.callback_query.from_user.id

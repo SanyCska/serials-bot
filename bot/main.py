@@ -103,8 +103,7 @@ class SeriesTrackerBot:
         # Note: addinwatchlater is handled by the ConversationHandler below
         self.dispatcher.add_handler(CommandHandler("addwatched", self.watched_handlers.add_watched_series_start))
         self.dispatcher.add_handler(CommandHandler("watched", self.watched_handlers.list_watched))
-        self.dispatcher.add_handler(CommandHandler("markwatched", self.conversation_manager.mark_watched_start))
-        
+
         # Add series in watchlist conversation handler
         add_series_conv = self.watchlist_handlers.get_add_series_conversation_handler(self.conversation_manager)
         
