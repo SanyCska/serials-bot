@@ -129,3 +129,36 @@ class WatchLaterHandlers:
             )
 
         return SELECTING_SERIES
+
+    def watchlater_series_selected(self, update: Update, context: CallbackContext) -> int:
+        """Handle series selection for watch later list only."""
+        query = update.callback_query
+        query.answer()
+
+        series_id = int(query.data.split('_')[1])
+        user = self.db.get_user(update.effective_user.id)
+
+        if not user:
+            query.edit_message_text("Ошибка: пользователь не найден.")
+            return ConversationHandler.END
+
+        # Get series details from TMDB
+        series_details = self.tmdb.get_series_details(series_id)
+        if not series_details:
+            query.edit_message_text('Извините, я не смог найти этот сериал.')
+            return ConversationHandler.END
+
+        # Add series to DB
+        local_series = self.db.add_series(
+            series_details['id'],
+            series_details['name'],
+            series_details.get('year'),
+            series_details.get('total_seasons')
+        )
+
+        # Add to user's watch later list
+        self.db.add_user_series(user.id, local_series.id, in_watchlist=True)
+        query.edit_message_text(
+            f'"{local_series.name}" добавлен в список "Посмотреть позже"'
+        )
+        return ConversationHandler.END

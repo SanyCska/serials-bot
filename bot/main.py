@@ -128,12 +128,12 @@ class SeriesTrackerBot:
             states={
                 SELECTING_SERIES: [
                     MessageHandler(Filters.text & ~Filters.command, self.conversation_manager.search_series),
-                    CallbackQueryHandler(self.conversation_manager.watchlater_series_selected, pattern=f"^{SERIES_PATTERN.format('.*')}$"),
+                    CallbackQueryHandler(self.watch_later_handlers.watchlater_series_selected, pattern=f"^{SERIES_PATTERN.format('.*')}$"),
                     CallbackQueryHandler(self.conversation_manager.cancel, pattern=f"^{CANCEL_PATTERN}$"),
                     CommandHandler("cancel", self.conversation_manager.cancel)
                 ],
                 SERIES_SELECTION: [
-                    CallbackQueryHandler(self.conversation_manager.watchlater_series_selected, pattern=f"^{SERIES_PATTERN.format('.*')}$"),
+                    CallbackQueryHandler(self.watch_later_handlers.watchlater_series_selected, pattern=f"^{SERIES_PATTERN.format('.*')}$"),
                     CallbackQueryHandler(self.conversation_manager.cancel, pattern=f"^{CANCEL_PATTERN}$")
                 ]
             },
@@ -151,7 +151,7 @@ class SeriesTrackerBot:
         self.dispatcher.add_handler(CallbackQueryHandler(self.watchlist_handlers.mark_watched_callback, pattern="^mark_watched_"))
         
         # Remove series handlers
-        self.dispatcher.add_handler(CallbackQueryHandler(self.remove_series_callback, pattern="^remove_series_"))
+        self.dispatcher.add_handler(CallbackQueryHandler(self.watchlist_handlers.remove_series_callback, pattern="^remove_series_"))
 
         # Add error handler
         self.dispatcher.add_error_handler(self.error_handler)
@@ -344,27 +344,7 @@ class SeriesTrackerBot:
             logger.warning(f"Unknown command button: {command}")
             query.answer("Unknown command")
             return ConversationHandler.END
-        
-    def remove_series_callback(self, update: Update, context: CallbackContext) -> None:
-        """Handle removing a series from the user's watching list."""
-        query = update.callback_query
-        query.answer()
-        try:
-            series_id = int(query.data.split('_')[2])
-            user = self.db.get_user(query.from_user.id)
-            if not user:
-                query.edit_message_text("Ошибка: пользователь не найден.")
-                return
-            # Remove the series from user's watching list
-            removed = self.db.remove_user_series(user.id, series_id)
-            if removed:
-                query.edit_message_text("✅ Сериал был удалён из вашего списка просмотра.")
-            else:
-                query.edit_message_text("❌ Не удалось удалить сериал. Пожалуйста, попробуйте позже.")
-        except Exception as e:
-            logger.error(f"Error removing series: {e}", exc_info=True)
-            query.edit_message_text("Произошла ошибка при удалении сериала. Пожалуйста, попробуйте ещё раз.")
-        
+
 def main():
     """Start the bot."""
     bot = SeriesTrackerBot(os.getenv('TELEGRAM_BOT_TOKEN'), DBHandler(), TMDBApi())
