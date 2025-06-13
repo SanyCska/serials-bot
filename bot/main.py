@@ -143,8 +143,8 @@ class SeriesTrackerBot:
         # Command button handlers
         self.dispatcher.add_handler(CallbackQueryHandler(self.handle_command_button, pattern="^command_"))
         
-        # Watchlist action handlers
-        self.dispatcher.add_handler(CallbackQueryHandler(self.conversation_manager.handle_watchlist_actions, pattern="^(move_watching_|watchlist_series_)"))
+        # Watch later action handlers
+        self.dispatcher.add_handler(CallbackQueryHandler(self.watch_later_handlers.handle_watch_later_actions, pattern="^(move_watching_|watchlist_series_)"))
         
         # Mark watched handlers
         self.dispatcher.add_handler(CallbackQueryHandler(self.watchlist_handlers.mark_watched_callback, pattern="^mark_watched_"))
