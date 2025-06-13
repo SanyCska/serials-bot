@@ -167,17 +167,24 @@ class DBHandler:
         
     def move_to_watching(self, user_id, series_id):
         """Move a series from watchlist to watching"""
+        logger.info(f"move_to_watching called with user_id={user_id}, series_id={series_id}")
+        
         user_series = self.session.query(UserSeries).filter(
             UserSeries.user_id == user_id,
             UserSeries.series_id == series_id
         ).first()
         
+        logger.info(f"Found user_series: {user_series}")
         if user_series:
+            logger.info(f"Before update: is_watching={user_series.is_watching}, in_watchlist={user_series.in_watchlist}")
             user_series.is_watching = True
             user_series.in_watchlist = False
             user_series.last_updated = datetime.utcnow()
             self.session.commit()
+            logger.info(f"After update: is_watching={user_series.is_watching}, in_watchlist={user_series.in_watchlist}")
             return True
+        else:
+            logger.error(f"No user_series found for user_id={user_id}, series_id={series_id}")
         
         return False
         

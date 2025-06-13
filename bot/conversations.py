@@ -146,60 +146,42 @@ class ConversationManager:
         if query.data.startswith("move_watching_"):
             logger.info("Processing move to watching action")
             series_id = int(query.data.split("_")[2])
+            logger.info(f"Extracted series_id: {series_id}")
+            
             user = self.db.get_user(query.from_user.id)
+            if not user:
+                logger.error(f"User not found for telegram_id: {query.from_user.id}")
+                query.edit_message_text("Ошибка: пользователь не найден.")
+                return ConversationHandler.END
+                
+            logger.info(f"Found user with id: {user.id}")
             series = None
             
             # Get series name for the message
             user_series_list = self.db.get_user_series_list(user.id, watchlist_only=True)
+            logger.info(f"Found {len(user_series_list)} series in watchlist")
             for user_series, s in user_series_list:
+                logger.info(f"Checking series: id={s.id}, name={s.name}")
                 if s.id == series_id:
                     series = s
+                    logger.info(f"Found matching series: {series.name}")
                     break
                     
             # Move series from watchlist to watching
-            if self.db.move_to_watching(user.id, series_id):
+            logger.info(f"Calling move_to_watching for user_id={user.id}, series_id={series_id}")
+            move_result = self.db.move_to_watching(user.id, series_id)
+            logger.info(f"Move result: {move_result}")
+            
+            if move_result:
                 if series:
                     series_name = series.name
-                    # Send prompt to update current episode and season
-                    keyboard = []
-                    
-                    # Get series seasons from TMDB if not manually added
-                    if series.tmdb_id > 0:
-                        series_details = self.tmdb.get_series_details(series.tmdb_id)
-                        if series_details and series_details['seasons']:
-                            for season in series_details['seasons']:
-                                keyboard.append([
-                                    InlineKeyboardButton(
-                                        f"Сезон {season['season_number']}",
-                                        callback_data=SEASON_PATTERN.format(series.tmdb_id, season['season_number'])
-                                    )
-                                ])
-                    
-                    # If no seasons from TMDB or manually added series, create buttons for seasons
-                    if not keyboard and series.total_seasons:
-                        for season_num in range(1, series.total_seasons + 1):
-                            keyboard.append([
-                                InlineKeyboardButton(
-                                    f"Сезон {season_num}",
-                                    callback_data=SEASON_PATTERN.format(series.id, season_num)
-                                )
-                            ])
-                    
-                    # Add cancel button
-                    keyboard.append([InlineKeyboardButton("Отмена", callback_data=CANCEL_PATTERN)])
-                    reply_markup = InlineKeyboardMarkup(keyboard)
-                    
                     query.edit_message_text(
-                        f"Я переместил '{series_name}' в ваш список просмотра!\n\n"
-                        "Какой сезон вы сейчас смотрите?",
-                        reply_markup=reply_markup
+                        f"✅ Сериал '{series_name}' теперь в процессе просмотра!\n\n"
                     )
-                    
-                    context.user_data["selected_series_id"] = series.id
-                    return SELECTING_SEASON
                 else:
-                    query.edit_message_text("Сериал перемещен в ваш список просмотра.")
+                    query.edit_message_text("✅ Сериал теперь в процессе просмотра!")
             else:
+                logger.error(f"Failed to move series {series_id} to watching for user {user.id}")
                 query.edit_message_text("Ошибка при перемещении сериала. Попробуйте позже.")
                 
             return ConversationHandler.END

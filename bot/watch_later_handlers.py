@@ -80,8 +80,10 @@ class WatchLaterHandlers:
             # Create buttons specific to this series
             keyboard = [
                 [
-                    InlineKeyboardButton(f"▶️ Начать просмотр", callback_data=f"move_watching_{series.id}"),
                     InlineKeyboardButton(f"❌ Удалить", callback_data=f"watchlist_series_{series.id}")
+                ],
+                [
+                    InlineKeyboardButton(f"▶️ Начать просмотр", callback_data=f"move_watching_{series.id}"),
                 ]
             ]
             reply_markup = InlineKeyboardMarkup(keyboard)
