@@ -148,7 +148,7 @@ class SeriesTrackerBot:
         # Create inline keyboard with primary commands
         keyboard = [
             [
-                InlineKeyboardButton("Добавить сериал в список", callback_data="command_add"),
+                InlineKeyboardButton("Добавить просматриваемый сериал", callback_data="command_add"),
                 InlineKeyboardButton("Сериалы в процессе", callback_data="command_list")
             ],
             [
@@ -179,7 +179,7 @@ class SeriesTrackerBot:
         # Create inline keyboard with primary commands
         keyboard = [
             [
-                InlineKeyboardButton("Добавить сериал в список", callback_data="command_add"),
+                InlineKeyboardButton("Добавить просматриваемый сериал", callback_data="command_add"),
                 InlineKeyboardButton("Сериалы в процессе", callback_data="command_list")
             ],
             [

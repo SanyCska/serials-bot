@@ -153,8 +153,13 @@ class WatchLaterHandlers:
         user = self.db.get_user(update.effective_user.id)
 
         if not user:
-            query.edit_message_text("Ошибка: пользователь не найден.")
-            return ConversationHandler.END
+            # Add user to database
+            user = self.db.add_user(
+                update.effective_user.id,
+                update.effective_user.username,
+                update.effective_user.first_name,
+                update.effective_user.last_name
+            )
 
         # Get series details from TMDB
         series_details = self.tmdb.get_series_details(series_id)
@@ -191,9 +196,14 @@ class WatchLaterHandlers:
 
             user = self.db.get_user(query.from_user.id)
             if not user:
-                logger.error(f"User not found for telegram_id: {query.from_user.id}")
-                query.edit_message_text("Ошибка: пользователь не найден.")
-                return ConversationHandler.END
+                logger.info(f"User not found for telegram_id: {query.from_user.id}, creating new user")
+                # Add user to database
+                user = self.db.add_user(
+                    query.from_user.id,
+                    query.from_user.username,
+                    query.from_user.first_name,
+                    query.from_user.last_name
+                )
 
             logger.info(f"Found user with id: {user.id}")
             series = None
@@ -236,9 +246,14 @@ class WatchLaterHandlers:
                 user = self.db.get_user(query.from_user.id)
 
                 if not user:
-                    logger.error(f"User not found for telegram_id: {query.from_user.id}")
-                    query.edit_message_text("Ошибка: пользователь не найден.")
-                    return ConversationHandler.END
+                    logger.info(f"User not found for telegram_id: {query.from_user.id}, creating new user")
+                    # Add user to database
+                    user = self.db.add_user(
+                        query.from_user.id,
+                        query.from_user.username,
+                        query.from_user.first_name,
+                        query.from_user.last_name
+                    )
 
                 logger.info(f"Found user with id: {user.id}")
 
