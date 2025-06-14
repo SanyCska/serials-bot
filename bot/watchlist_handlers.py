@@ -364,7 +364,7 @@ class WatchlistHandlers:
                 ],
                 [
                     InlineKeyboardButton("❓ Помощь", callback_data="command_help"),
-                    InlineKeyboardButton("Просмотренные сериалы", callback_data="command_watched")
+                    InlineKeyboardButton("Просмотренные", callback_data="command_watched")
                 ]
             ]
             reply_markup = InlineKeyboardMarkup(keyboard)

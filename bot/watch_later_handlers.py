@@ -120,7 +120,9 @@ class WatchLaterHandlers:
         keyboard = [
             [
                 InlineKeyboardButton("➕ Добавить в список", callback_data="command_addwatch"),
-                InlineKeyboardButton("📺 Просмотр списка", callback_data="command_list")
+            ],
+            [
+                InlineKeyboardButton("📺 Начатые сериалы", callback_data="command_list")
             ],
             [
                 InlineKeyboardButton("❓ Помощь", callback_data="command_help")
