@@ -278,12 +278,12 @@ class WatchlistHandlers:
             reply_markup = InlineKeyboardMarkup(keyboard)
             if update.callback_query:
                 update.callback_query.edit_message_text(
-                    "Сначала вам нужно добавить сериал. Используйте команду /add или кнопку ниже.",
+                    "Ваш список просматриваемых сериалов пуст",
                     reply_markup=reply_markup
                 )
             else:
                 update.message.reply_text(
-                    "Сначала вам нужно добавить сериал. Используйте команду /add или кнопку ниже.",
+                    "Ваш список просматриваемых сериалов пуст",
                     reply_markup=reply_markup
                 )
             return
@@ -651,9 +651,9 @@ class WatchlistHandlers:
         if not user:
             if update.callback_query:
                 update.callback_query.answer()
-                update.callback_query.edit_message_text("Сначала вам нужно добавить сериал. Используйте команду /add.")
+                update.callback_query.edit_message_text("Ваш список просматриваемых сериалов пуст")
             else:
-                update.message.reply_text("Сначала вам нужно добавить сериал. Используйте команду /add.")
+                update.message.reply_text("Ваш список просматриваемых сериалов пуст")
             return ConversationHandler.END
         user_series_list = self.db.get_user_series_list(user.id)
         if not user_series_list:

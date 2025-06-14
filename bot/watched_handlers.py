@@ -28,16 +28,24 @@ class WatchedHandlers:
         """List all watched series for a user."""
         if update.callback_query:
             query = update.callback_query
-            user = self.db.get_user(query.from_user.id)
+            telegram_id = query.from_user.id
+            effective_user = query.from_user
+            user = self.db.get_user(telegram_id)
             send = lambda text, **kwargs: query.edit_message_text(text, **kwargs)
         else:
-            user = self.db.get_user(update.effective_user.id)
+            telegram_id = update.effective_user.id
+            effective_user = update.effective_user
+            user = self.db.get_user(telegram_id)
             send = lambda text, **kwargs: update.message.reply_text(text, **kwargs)
 
         if not user:
-            send(
-                "Вы ещё не добавили ни одного сериала. Используйте /addwatched, чтобы добавить первый просмотренный сериал.")
-            return
+            # Add user to database
+            user = self.db.add_user(
+                telegram_id,
+                effective_user.username,
+                effective_user.first_name,
+                effective_user.last_name
+            )
 
         series_list = self.db.get_user_series_list(user.id, watched_only=True)
 
@@ -114,8 +122,13 @@ class WatchedHandlers:
         user = self.db.get_user(update.effective_user.id)
 
         if not user:
-            query.edit_message_text("Error: User not found.")
-            return ConversationHandler.END
+            # Add user to database
+            user = self.db.add_user(
+                update.effective_user.id,
+                update.effective_user.username,
+                update.effective_user.first_name,
+                update.effective_user.last_name
+            )
 
         # 1. Получить детали сериала
         series_details = self.tmdb.get_series_details(series_id)

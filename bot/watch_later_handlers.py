@@ -44,26 +44,27 @@ class WatchLaterHandlers:
     def view_watch_later_start(self, update: Update, context: CallbackContext) -> int:
         """Start the watchlist viewing process."""
         # Get user from database
-        user = self.db.get_user(
-            update.effective_user.id if update.effective_user else update.callback_query.from_user.id)
+        telegram_id = update.effective_user.id if update.effective_user else update.callback_query.from_user.id
+        effective_user = update.effective_user if update.effective_user else update.callback_query.from_user
+        user = self.db.get_user(telegram_id)
 
         if not user:
-            message = "Сначала вам нужно добавить сериал. Используйте команду /add или /addwatch."
-            if update.callback_query:
-                update.callback_query.answer()
-                update.callback_query.edit_message_text(message)
-            else:
-                update.message.reply_text(message)
-            return ConversationHandler.END
+            # Add user to database
+            user = self.db.add_user(
+                telegram_id,
+                effective_user.username,
+                effective_user.first_name,
+                effective_user.last_name
+            )
 
-        # Get user's watchlist
+        # Get user's watch later list
         user_series_list = self.db.get_user_series_list(user.id, watchlist_only=True)
 
         if not user_series_list:
             # Create keyboard with options
             keyboard = [
                 [InlineKeyboardButton("Добавить в список 'Посмотреть позже'", callback_data="command_addwatch")],
-                [InlineKeyboardButton("Просмотр списка просмотра", callback_data="command_list")],
+                [InlineKeyboardButton("Просматриваемые сериалы", callback_data="command_list")],
                 [InlineKeyboardButton("Помощь", callback_data="command_help")]
             ]
             reply_markup = InlineKeyboardMarkup(keyboard)
