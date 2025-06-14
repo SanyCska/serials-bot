@@ -425,7 +425,7 @@ class WatchlistHandlers:
 
         # Create keyboard for episode selection
         keyboard = []
-        for episode in range(1, 21):  # Show up to 20 episodes
+        for episode in range(1, 10):  # Show up to 20 episodes
             keyboard.append([
                 InlineKeyboardButton(
                     f"Серия {episode}",
@@ -474,7 +474,7 @@ class WatchlistHandlers:
                 
                 # Create keyboard for episode selection
                 keyboard = []
-                for episode in range(1, 21):  # Show up to 20 episodes
+                for episode in range(1, 10):  # Show up to 20 episodes
                     keyboard.append([
                         InlineKeyboardButton(
                             f"Серия {episode}",
